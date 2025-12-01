@@ -1,29 +1,28 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import {
-  getAuth,
-  onAuthStateChanged,
-  signInAnonymously,
-  signInWithCustomToken
+import { 
+  getAuth, 
+  onAuthStateChanged, 
+  signInAnonymously, 
+  signInWithCustomToken 
 } from 'firebase/auth';
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  query,
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot, 
+  query, 
   serverTimestamp
 } from 'firebase/firestore';
-import {
-  Plus, Trash2, FileText, Users, Printer, Save, Copy,
-  ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, Stamp, ListPlus, X, Search, Edit, RotateCcw
+import { 
+  Plus, Trash2, FileText, Users, Printer, Save, Copy, 
+  ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, Stamp, ListPlus, X, Search, Edit, RotateCcw, FileCheck, ClipboardList
 } from 'lucide-react';
 
 // --- 設定區：預設圖檔路徑 ---
-// 請確保你的圖片已放入專案的 public 資料夾，並命名如下
 const DEFAULT_LOGO_PATH = '/logo.jpg';
 const DEFAULT_STAMP_PATH = '/stamp.png';
 
@@ -104,7 +103,7 @@ const Spinner = () => (
 const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸入..." }) => {
   const isCustom = !options.includes(value) && value !== '';
   const [mode, setMode] = useState(isCustom ? 'custom' : 'select');
-
+  
   useEffect(() => {
     if (!options.includes(value) && value !== '') {
       setMode('custom');
@@ -117,7 +116,7 @@ const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸
     const val = e.target.value;
     if (val === 'OTHER_CUSTOM') {
       setMode('custom');
-      onChange('');
+      onChange(''); 
     } else {
       setMode('select');
       onChange(val);
@@ -128,7 +127,7 @@ const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸
     <div className="w-full">
       <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">{label}</label>
       {mode === 'select' ? (
-        <select
+        <select 
           className="w-full text-sm border-gray-200 rounded bg-gray-50 px-2 py-2 focus:ring-teal-500 focus:border-teal-500"
           value={value}
           onChange={handleSelectChange}
@@ -138,14 +137,14 @@ const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸
         </select>
       ) : (
         <div className="flex gap-2">
-          <input
+          <input 
             className="flex-1 text-sm border-teal-500 ring-1 ring-teal-500 rounded bg-white px-2 py-2 focus:ring-teal-600"
             value={value}
             placeholder={placeholder}
             onChange={(e) => onChange(e.target.value)}
             autoFocus
           />
-          <button
+          <button 
             onClick={() => { setMode('select'); onChange(options[0]); }}
             className="px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded hover:bg-gray-300"
           >
@@ -170,7 +169,7 @@ const NoteSelector = ({ value, onChange }) => {
     <div className="w-full">
       <div className="flex justify-between items-center mb-1">
         <label className="block text-xs font-bold text-gray-500 uppercase">備註 Notes</label>
-        <select
+        <select 
           className="text-xs border-none bg-transparent text-teal-600 font-medium focus:ring-0 cursor-pointer p-0"
           onChange={handleTemplateChange}
           defaultValue=""
@@ -180,7 +179,7 @@ const NoteSelector = ({ value, onChange }) => {
           <option value="custom">手動編輯</option>
         </select>
       </div>
-      <textarea
+      <textarea 
         className="w-full text-sm border-gray-200 rounded bg-gray-50 px-3 py-2 focus:ring-teal-500 focus:border-teal-500 h-32 leading-relaxed"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -222,16 +221,16 @@ export default function App() {
               </div>
               <div className="flex space-x-1 overflow-x-auto no-scrollbar">
                 {[
-                  { id: 'dashboard', label: '報價列表', icon: FileText },
+                  { id: 'dashboard', label: '報價管理', icon: FileText },
                   { id: 'customers', label: '客戶通訊錄', icon: Users },
                   { id: 'products', label: '產品/服務庫', icon: Package },
                 ].map(item => (
-                  <button
+                  <button 
                     key={item.id}
                     onClick={() => setView(item.id)}
                     className={`flex items-center px-3 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap
-                      ${view === item.id
-                        ? 'bg-teal-900 shadow-inner border border-teal-600 text-white'
+                      ${view === item.id 
+                        ? 'bg-teal-900 shadow-inner border border-teal-600 text-white' 
                         : 'hover:bg-teal-700 text-teal-100 border border-transparent'}`}
                   >
                     <item.icon className="w-4 h-4 mr-2" />
@@ -246,18 +245,18 @@ export default function App() {
 
       <main className={`w-full max-w-full ${printMode ? 'p-0' : 'py-6 px-4 sm:px-6 lg:px-8'}`}>
         {view === 'dashboard' && (
-          <Dashboard
-            user={user}
-            onEdit={(id) => { setActiveQuoteId(id); setView('editor'); }}
+          <Dashboard 
+            user={user} 
+            onEdit={(id) => { setActiveQuoteId(id); setView('editor'); }} 
             onCreate={() => { setActiveQuoteId(null); setView('editor'); }}
           />
         )}
         {view === 'customers' && <CustomerManager />}
         {view === 'products' && <ProductManager />}
         {view === 'editor' && (
-          <QuoteEditor
-            user={user}
-            quoteId={activeQuoteId}
+          <QuoteEditor 
+            user={user} 
+            quoteId={activeQuoteId} 
             setActiveQuoteId={setActiveQuoteId}
             onBack={() => setView('dashboard')}
             onPrintToggle={setPrintMode}
@@ -274,6 +273,7 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
   const [quotes, setQuotes] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('quotes'); // 'quotes' (進行中), 'orders' (已成交)
 
   useEffect(() => {
     document.title = "傑太環境工程報價系統";
@@ -294,15 +294,32 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
     }
   };
 
+  // 1. 先做搜尋篩選
   const filteredQuotes = useMemo(() => {
-    if (!searchTerm) return quotes;
-    const lower = searchTerm.toLowerCase();
-    return quotes.filter(q =>
-      q.quoteNumber?.toLowerCase().includes(lower) ||
-      q.clientName?.toLowerCase().includes(lower) ||
-      q.projectName?.toLowerCase().includes(lower)
-    );
+    let result = quotes;
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      result = result.filter(q => 
+        q.quoteNumber?.toLowerCase().includes(lower) ||
+        q.clientName?.toLowerCase().includes(lower) ||
+        q.projectName?.toLowerCase().includes(lower)
+      );
+    }
+    return result;
   }, [quotes, searchTerm]);
+
+  // 2. 再做分頁篩選 (核心邏輯)
+  const tabFilteredQuotes = useMemo(() => {
+    return filteredQuotes.filter(q => {
+      if (activeTab === 'quotes') {
+        // 進行中：草稿、已發送、已確認、已取消 (除非你想把取消也分出去)
+        return ['draft', 'sent', 'confirmed', 'cancelled'].includes(q.status) || !q.status;
+      } else {
+        // 已成交：已轉訂單
+        return q.status === 'ordered';
+      }
+    });
+  }, [filteredQuotes, activeTab]);
 
   const statusConfig = {
     draft: { label: '草稿', color: 'bg-gray-100 text-gray-600 border-gray-200' },
@@ -316,21 +333,22 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
 
   return (
     <div className="space-y-6 w-full">
+      {/* 上方標題與按鈕區 */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-800 border-l-4 border-teal-600 pl-3">專案報價管理</h2>
-
+        
         <div className="flex flex-1 w-full md:w-auto gap-2 justify-end">
           <div className="relative w-full md:w-64">
-            <input
-              type="text"
-              placeholder="搜尋單號、客戶、專案..."
+            <input 
+              type="text" 
+              placeholder="搜尋單號、客戶、專案..." 
               className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
           </div>
-          <button
+          <button 
             onClick={onCreate}
             className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 shadow-sm transition-colors whitespace-nowrap"
           >
@@ -339,7 +357,34 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200 w-full">
+      {/* 分頁籤 (Tabs) */}
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('quotes')}
+          className={`flex items-center py-2 px-6 border-b-2 font-medium text-sm transition-colors ${
+            activeTab === 'quotes'
+              ? 'border-teal-600 text-teal-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+          }`}
+        >
+          <ClipboardList className="w-4 h-4 mr-2" />
+          進行中報價 ({filteredQuotes.filter(q => ['draft', 'sent', 'confirmed', 'cancelled'].includes(q.status) || !q.status).length})
+        </button>
+        <button
+          onClick={() => setActiveTab('orders')}
+          className={`flex items-center py-2 px-6 border-b-2 font-medium text-sm transition-colors ${
+            activeTab === 'orders'
+              ? 'border-green-600 text-green-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+          }`}
+        >
+          <FileCheck className="w-4 h-4 mr-2" />
+          已回簽訂單 ({filteredQuotes.filter(q => q.status === 'ordered').length})
+        </button>
+      </div>
+
+      {/* 列表區塊 */}
+      <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200 w-full mt-0 rounded-tl-none">
         <div className="overflow-x-auto w-full">
           <table className="min-w-full divide-y divide-gray-200 w-full">
             <thead className="bg-gray-50">
@@ -353,11 +398,11 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredQuotes.map((quote) => {
+              {tabFilteredQuotes.map((quote) => {
                 const status = statusConfig[quote.status] || statusConfig.draft;
                 return (
-                  <tr
-                    key={quote.id}
+                  <tr 
+                    key={quote.id} 
                     onClick={() => onEdit(quote.id)}
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                   >
@@ -395,10 +440,15 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
                   </tr>
                 );
               })}
-              {filteredQuotes.length === 0 && (
+              {tabFilteredQuotes.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="px-6 py-10 text-center text-gray-500">
-                    找不到符合的報價單
+                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="bg-gray-100 p-3 rounded-full mb-3">
+                        {activeTab === 'quotes' ? <ClipboardList className="w-6 h-6 text-gray-400" /> : <FileCheck className="w-6 h-6 text-gray-400" />}
+                      </div>
+                      <p>此分類目前沒有資料</p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -416,7 +466,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
   const [saving, setSaving] = useState(false);
   const [logoPreview, setLogoPreview] = useState(DEFAULT_LOGO_PATH);
   const [stampPreview, setStampPreview] = useState(DEFAULT_STAMP_PATH);
-
+  
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
 
@@ -443,8 +493,8 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
   });
 
   useEffect(() => {
-    const unsubC = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), s => setCustomers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubP = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'products'), s => setProducts(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubC = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), s => setCustomers(s.docs.map(d=>({id:d.id, ...d.data()}))));
+    const unsubP = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'products'), s => setProducts(s.docs.map(d=>({id:d.id, ...d.data()}))));
     return () => { unsubC(); unsubP(); };
   }, []);
 
@@ -452,7 +502,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     if (quoteId) {
       setLoading(true);
       const unsub = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', quoteId), (doc) => {
-        if (doc.exists()) {
+        if(doc.exists()) {
           const data = doc.data();
           setFormData(prev => ({ ...prev, ...data }));
         }
@@ -503,12 +553,12 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     if (!pid) return;
     const p = products.find(prod => prod.id === pid);
     if (p) addItem(p);
-    e.target.value = "";
+    e.target.value = ""; 
   };
 
   const handleClientSelect = (e) => {
     const c = customers.find(x => x.id === e.target.value);
-    if (c) {
+    if(c) {
       setFormData(prev => ({
         ...prev,
         clientName: c.name,
@@ -534,7 +584,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
   };
 
   const save = async (silent = false) => {
-    if (!silent) setSaving(true);
+    if(!silent) setSaving(true);
     const payload = { ...formData, subtotal, tax, grandTotal, updatedAt: serverTimestamp() };
     try {
       if (quoteId) {
@@ -543,20 +593,20 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         const ref = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'), {
           ...payload, createdAt: serverTimestamp()
         });
-        if (!quoteId) setActiveQuoteId(ref.id);
+        if(!quoteId) setActiveQuoteId(ref.id);
       }
     } catch (e) { console.error(e); alert('儲存失敗'); }
-    if (!silent) setSaving(false);
+    if(!silent) setSaving(false);
   };
 
   const versionUp = async () => {
-    if (!confirm('確定要建立新版本嗎？')) return;
+    if(!confirm('確定要建立新版本嗎？')) return;
     setSaving(true);
     const newVer = formData.version + 1;
-    const newNumber = formData.quoteNumber.includes('-V')
-      ? formData.quoteNumber.replace(/-V\d+$/, `-V${newVer}`)
+    const newNumber = formData.quoteNumber.includes('-V') 
+      ? formData.quoteNumber.replace(/-V\d+$/, `-V${newVer}`) 
       : `${formData.quoteNumber}-V${newVer}`;
-
+      
     const payload = {
       ...formData,
       quoteNumber: newNumber,
@@ -566,7 +616,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
       updatedAt: serverTimestamp(),
       subtotal, tax, grandTotal
     };
-
+    
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'), payload);
     setSaving(false);
     onBack();
@@ -576,19 +626,19 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
 
   return (
     <div className={`bg-white ${isPrintMode ? '' : 'shadow-xl rounded-xl border border-gray-200'} flex flex-col min-h-[calc(100vh-6rem)] w-full`}>
-
+      
       {!isPrintMode && (
         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex flex-wrap gap-3 justify-between items-center sticky top-0 z-20">
           <button onClick={onBack} className="text-gray-600 hover:text-gray-900 flex items-center">
             <ArrowLeft className="w-5 h-5 mr-1" /> 返回
           </button>
-
+          
           <div className="flex items-center space-x-2">
-            <select
+            <select 
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              onChange={(e) => setFormData({...formData, status: e.target.value})}
               className={`text-sm font-bold uppercase rounded border-gray-300 shadow-sm focus:ring-teal-500 focus:border-teal-500
-                ${formData.status === 'ordered' ? 'text-green-600 bg-green-50' :
+                ${formData.status === 'ordered' ? 'text-green-600 bg-green-50' : 
                   formData.status === 'confirmed' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-600'}`}
             >
               <option value="draft">草稿 Draft</option>
@@ -615,11 +665,11 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
 
       {/* --- Document --- */}
       <div className={`flex-1 ${isPrintMode ? 'p-0 w-full max-w-[210mm] mx-auto' : 'p-8 sm:p-12'}`}>
-
+        
         {/* Print Mode Cancel Button (Visible only on Screen) */}
         {isPrintMode && (
           <div className="no-print fixed top-4 right-4 z-50">
-            <button
+            <button 
               onClick={() => onPrintToggle(false)}
               className="flex items-center px-4 py-2 bg-red-600 text-white rounded shadow-lg hover:bg-red-700"
             >
@@ -633,13 +683,13 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           <div className="flex gap-6">
             {/* Logo Area */}
             <div className="relative group">
-              <img
-                src={logoPreview}
-                alt="Company Logo"
+              <img 
+                src={logoPreview} 
+                alt="Company Logo" 
                 className="h-24 w-auto object-contain"
-                onError={(e) => { e.target.style.display = 'none'; }}
+                onError={(e) => { e.target.style.display='none'; }} 
               />
-
+              
               {!isPrintMode && (
                 <label className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-10 cursor-pointer transition-all">
                   <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setLogoPreview)} className="hidden" />
@@ -663,33 +713,33 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
             <div className="inline-block text-left w-full">
               <div className="grid grid-cols-3 gap-y-2 text-sm items-center mb-4">
                 <span className="text-gray-500 font-medium">報價單號：</span>
-                <input
+                <input 
                   className="col-span-2 text-right font-bold text-teal-700 border-none p-0 bg-transparent focus:ring-0"
                   value={formData.quoteNumber}
-                  onChange={e => setFormData({ ...formData, quoteNumber: e.target.value })}
+                  onChange={e => setFormData({...formData, quoteNumber: e.target.value})}
                 />
                 <span className="text-gray-500 font-medium">報價日期：</span>
-                <input
+                <input 
                   type="date"
                   className="col-span-2 text-right border-none p-0 bg-transparent focus:ring-0 text-gray-800"
                   value={formData.date}
-                  onChange={e => setFormData({ ...formData, date: e.target.value })}
+                  onChange={e => setFormData({...formData, date: e.target.value})}
                 />
                 <span className="text-gray-500 font-medium">有效期限：</span>
-                <input
+                <input 
                   type="date"
                   className="col-span-2 text-right border-none p-0 bg-transparent focus:ring-0 text-gray-800"
                   value={formData.validUntil}
-                  onChange={e => setFormData({ ...formData, validUntil: e.target.value })}
+                  onChange={e => setFormData({...formData, validUntil: e.target.value})}
                 />
               </div>
               <div className="bg-teal-50 p-3 rounded border border-teal-100">
                 <label className="block text-xs font-bold text-teal-800 mb-1">專案名稱 Project Name</label>
-                <input
+                <input 
                   className="w-full bg-white border border-teal-200 rounded px-2 py-1 text-sm focus:border-teal-500 focus:ring-teal-500"
                   placeholder="請輸入專案名稱..."
                   value={formData.projectName}
-                  onChange={e => setFormData({ ...formData, projectName: e.target.value })}
+                  onChange={e => setFormData({...formData, projectName: e.target.value})}
                 />
               </div>
             </div>
@@ -699,59 +749,59 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         {/* Client Info */}
         <section className="mb-8">
           <div className="flex justify-between items-end mb-2 border-b border-gray-200 pb-1">
-            <h3 className="font-bold text-gray-700">客戶資料 Customer</h3>
-            {!isPrintMode && (
-              <select
-                className="text-xs border-gray-300 rounded py-1 pl-2 pr-8 shadow-sm focus:border-teal-500 focus:ring-teal-500"
-                onChange={handleClientSelect}
-                defaultValue=""
-              >
-                <option value="" disabled>快速載入舊客戶...</option>
-                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            )}
+             <h3 className="font-bold text-gray-700">客戶資料 Customer</h3>
+             {!isPrintMode && (
+                <select 
+                  className="text-xs border-gray-300 rounded py-1 pl-2 pr-8 shadow-sm focus:border-teal-500 focus:ring-teal-500"
+                  onChange={handleClientSelect}
+                  defaultValue=""
+                >
+                  <option value="" disabled>快速載入舊客戶...</option>
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+             )}
           </div>
           <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
             <div className="flex items-center">
               <span className="w-20 text-gray-500">客戶名稱：</span>
-              <input
+              <input 
                 className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent font-medium text-gray-900"
                 value={formData.clientName}
                 placeholder="公司名稱"
-                onChange={e => setFormData({ ...formData, clientName: e.target.value })}
+                onChange={e => setFormData({...formData, clientName: e.target.value})}
               />
             </div>
             <div className="flex items-center">
               <span className="w-20 text-gray-500">統一編號：</span>
-              <input
+              <input 
                 className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
                 value={formData.clientTaxId}
                 placeholder="8碼統編"
-                onChange={e => setFormData({ ...formData, clientTaxId: e.target.value })}
+                onChange={e => setFormData({...formData, clientTaxId: e.target.value})}
               />
             </div>
             <div className="flex items-center">
               <span className="w-20 text-gray-500">聯絡人：</span>
-              <input
+              <input 
                 className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
                 value={formData.clientContact}
-                onChange={e => setFormData({ ...formData, clientContact: e.target.value })}
+                onChange={e => setFormData({...formData, clientContact: e.target.value})}
               />
             </div>
             <div className="flex items-center">
               <span className="w-20 text-gray-500">電話：</span>
-              <input
+              <input 
                 className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
                 value={formData.clientPhone}
-                onChange={e => setFormData({ ...formData, clientPhone: e.target.value })}
+                onChange={e => setFormData({...formData, clientPhone: e.target.value})}
               />
             </div>
             <div className="flex items-center col-span-2">
               <span className="w-20 text-gray-500">地址：</span>
-              <input
+              <input 
                 className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
                 value={formData.clientAddress}
-                onChange={e => setFormData({ ...formData, clientAddress: e.target.value })}
+                onChange={e => setFormData({...formData, clientAddress: e.target.value})}
               />
             </div>
           </div>
@@ -778,7 +828,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                 <tr key={item.id} className="group">
                   <td className="px-2 py-2 text-xs text-gray-500 align-top pt-3">{idx + 1}</td>
                   <td className="px-2 py-2 align-top">
-                    <textarea
+                    <textarea 
                       className="w-full border-0 p-1 text-sm font-bold text-gray-900 focus:ring-0 resize-none bg-transparent"
                       rows={1}
                       value={item.name}
@@ -787,7 +837,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                     />
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <textarea
+                    <textarea 
                       className="w-full border-0 p-1 text-xs text-gray-600 focus:ring-0 resize-none bg-transparent placeholder-gray-300"
                       rows={2}
                       value={item.spec}
@@ -796,7 +846,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                     />
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <input
+                     <input 
                       className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent"
                       value={item.frequency}
                       placeholder="-"
@@ -804,14 +854,14 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                     />
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <input
+                    <input 
                       className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent"
                       value={item.unit}
                       onChange={e => handleItemChange(item.id, 'unit', e.target.value)}
                     />
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <input
+                    <input 
                       type="number"
                       className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500"
                       value={item.qty}
@@ -819,7 +869,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                     />
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <input
+                    <input 
                       type="number"
                       className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500"
                       value={item.price}
@@ -840,19 +890,19 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
               ))}
             </tbody>
           </table>
-
+          
           {!isPrintMode && (
             <div className="mt-4 flex gap-2 items-center">
               <button onClick={() => addItem()} className="flex items-center text-sm text-teal-600 hover:text-teal-800 font-medium px-3 py-1 border border-teal-200 rounded hover:bg-teal-50">
                 <Plus className="w-4 h-4 mr-1" /> 手動新增項目
               </button>
-
+              
               <div className="h-6 w-px bg-gray-300 mx-2"></div>
-
+              
               {/* Product Library Dropdown */}
               <div className="relative">
-                <select
-                  onChange={handleProductSelect}
+                <select 
+                  onChange={handleProductSelect} 
                   className="pl-8 pr-4 py-1 text-sm border-gray-300 rounded shadow-sm focus:ring-teal-500 focus:border-teal-500 cursor-pointer hover:bg-gray-50"
                   defaultValue=""
                 >
@@ -875,23 +925,23 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         <div className="flex flex-col md:flex-row gap-8 break-inside-avoid">
           {/* Smart Terms Section */}
           <div className="flex-1 space-y-4">
-            <SmartSelect
-              label="付款方式 Payment Method"
+            <SmartSelect 
+              label="付款方式 Payment Method" 
               options={PAYMENT_METHODS}
               value={formData.paymentMethod}
-              onChange={(val) => setFormData({ ...formData, paymentMethod: val })}
+              onChange={(val) => setFormData({...formData, paymentMethod: val})}
             />
-
-            <SmartSelect
-              label="付款期限 Payment Terms"
+            
+            <SmartSelect 
+              label="付款期限 Payment Terms" 
               options={PAYMENT_TERMS}
               value={formData.paymentTerms}
-              onChange={(val) => setFormData({ ...formData, paymentTerms: val })}
+              onChange={(val) => setFormData({...formData, paymentTerms: val})}
             />
 
-            <NoteSelector
-              value={formData.notes}
-              onChange={(val) => setFormData({ ...formData, notes: val })}
+            <NoteSelector 
+              value={formData.notes} 
+              onChange={(val) => setFormData({...formData, notes: val})} 
             />
           </div>
 
@@ -918,30 +968,30 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
 
         {/* Signature Area (Always visible now, but clear it's for print) */}
         <div className={`mt-24 flex justify-between gap-16 ${!isPrintMode ? 'opacity-50 hover:opacity-100 transition-opacity' : ''}`}>
-          <div className="flex-1 text-center relative group">
-            {/* Digital Stamp Uploader - 預設顯示 public 資料夾的圖 */}
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-32 h-32 z-10 pointer-events-none">
-              <img
-                src={stampPreview}
-                alt="Company Stamp"
-                className="w-full h-full object-contain opacity-80"
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
+            <div className="flex-1 text-center relative group">
+              {/* Digital Stamp Uploader - 預設顯示 public 資料夾的圖 */}
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-32 h-32 z-10 pointer-events-none">
+                <img 
+                  src={stampPreview} 
+                  alt="Company Stamp" 
+                  className="w-full h-full object-contain opacity-80" 
+                  onError={(e) => { e.target.style.display='none'; }}
+                />
+              </div>
+              
+              {!isPrintMode && (
+                <label className="absolute inset-0 cursor-pointer z-20" title="點擊上傳其他印章 (僅限本次)">
+                  <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setStampPreview)} className="hidden" />
+                </label>
+              )}
+
+              <div className="border-b border-gray-800 pb-2 mb-2"></div>
+              <p className="text-sm font-bold text-gray-600">傑太環境工程顧問有限公司 (簽章)</p>
             </div>
-
-            {!isPrintMode && (
-              <label className="absolute inset-0 cursor-pointer z-20" title="點擊上傳其他印章 (僅限本次)">
-                <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setStampPreview)} className="hidden" />
-              </label>
-            )}
-
-            <div className="border-b border-gray-800 pb-2 mb-2"></div>
-            <p className="text-sm font-bold text-gray-600">傑太環境工程顧問有限公司 (簽章)</p>
-          </div>
-          <div className="flex-1 text-center">
-            <div className="border-b border-gray-800 pb-2 mb-2 mt-[60px]"></div> {/* Spacing for alignment */}
-            <p className="text-sm font-bold text-gray-600">客戶確認簽回 (簽章)</p>
-          </div>
+            <div className="flex-1 text-center">
+               <div className="border-b border-gray-800 pb-2 mb-2 mt-[60px]"></div> {/* Spacing for alignment */}
+               <p className="text-sm font-bold text-gray-600">客戶確認簽回 (簽章)</p>
+            </div>
         </div>
       </div>
 
@@ -975,8 +1025,8 @@ const CustomerManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name) return;
-
+    if(!form.name) return;
+    
     if (editingId) {
       // Update Mode
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', editingId), form);
@@ -997,8 +1047,8 @@ const CustomerManager = () => {
     setEditingId(null);
     setForm({ name: '', taxId: '', contact: '', phone: '', fax: '', address: '', email: '' });
   };
-
-  const handleDelete = async (id) => { if (confirm('刪除?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', id)); };
+  
+  const handleDelete = async (id) => { if(confirm('刪除?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', id)); };
 
   return (
     <div className="space-y-6 w-full">
@@ -1015,19 +1065,19 @@ const CustomerManager = () => {
           )}
         </div>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input className="input-std md:col-span-2" placeholder="公司名稱" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-          <input className="input-std" placeholder="統一編號" value={form.taxId} onChange={e => setForm({ ...form, taxId: e.target.value })} />
-          <input className="input-std" placeholder="聯絡人" value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} />
-          <input className="input-std" placeholder="電話" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
-          <input className="input-std" placeholder="傳真" value={form.fax} onChange={e => setForm({ ...form, fax: e.target.value })} />
-          <input className="input-std md:col-span-2" placeholder="地址" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
-          <input className="input-std md:col-span-4" placeholder="Email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+          <input className="input-std md:col-span-2" placeholder="公司名稱" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+          <input className="input-std" placeholder="統一編號" value={form.taxId} onChange={e=>setForm({...form, taxId:e.target.value})} />
+          <input className="input-std" placeholder="聯絡人" value={form.contact} onChange={e=>setForm({...form, contact:e.target.value})} />
+          <input className="input-std" placeholder="電話" value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})} />
+          <input className="input-std" placeholder="傳真" value={form.fax} onChange={e=>setForm({...form, fax:e.target.value})} />
+          <input className="input-std md:col-span-2" placeholder="地址" value={form.address} onChange={e=>setForm({...form, address:e.target.value})} />
+          <input className="input-std md:col-span-4" placeholder="Email" value={form.email} onChange={e=>setForm({...form, email:e.target.value})} />
           <button className={`text-white py-2 px-4 rounded md:col-span-4 transition-colors ${editingId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-teal-600 hover:bg-teal-700'}`}>
             {editingId ? '更新資料' : '新增'}
           </button>
         </form>
       </div>
-
+      
       <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200 w-full">
         <table className="min-w-full divide-y divide-gray-200 w-full">
           <thead className="bg-gray-50">
@@ -1079,8 +1129,8 @@ const ProductManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name) return;
-
+    if(!form.name) return;
+    
     const payload = { ...form, price: Number(form.price) };
 
     if (editingId) {
@@ -1101,8 +1151,8 @@ const ProductManager = () => {
     setEditingId(null);
     setForm({ name: '', spec: '', unit: '式', price: 0 });
   };
-
-  const handleDelete = async (id) => { if (confirm('刪除?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id)); };
+  
+  const handleDelete = async (id) => { if(confirm('刪除?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id)); };
 
   return (
     <div className="space-y-6 w-full">
@@ -1119,16 +1169,16 @@ const ProductManager = () => {
           )}
         </div>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <input className="input-std md:col-span-2" placeholder="產品/服務名稱" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-          <input className="input-std" placeholder="規格/備註" value={form.spec} onChange={e => setForm({ ...form, spec: e.target.value })} />
-          <input className="input-std w-20" placeholder="單位" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} />
-          <input className="input-std w-24" type="number" placeholder="單價" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
+          <input className="input-std md:col-span-2" placeholder="產品/服務名稱" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+          <input className="input-std" placeholder="規格/備註" value={form.spec} onChange={e=>setForm({...form, spec:e.target.value})} />
+          <input className="input-std w-20" placeholder="單位" value={form.unit} onChange={e=>setForm({...form, unit:e.target.value})} />
+          <input className="input-std w-24" type="number" placeholder="單價" value={form.price} onChange={e=>setForm({...form, price:e.target.value})} />
           <button className={`text-white py-2 px-4 rounded hover:opacity-90 ${editingId ? 'bg-orange-500' : 'bg-teal-600'}`}>
             {editingId ? '更新' : '新增'}
           </button>
         </form>
       </div>
-
+      
       <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200 w-full">
         <table className="min-w-full divide-y divide-gray-200 w-full">
           <thead className="bg-gray-50">
