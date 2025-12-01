@@ -1,0 +1,27 @@
+/* 這是重置樣式檔
+  我們把原本 Vite 預設的 max-width: 1280px 限制拿掉
+  讓 Tailwind CSS 可以完全接管版面，達成 100% 全螢幕寬度 
+*/
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  /* 強制 body 佔滿寬度 */
+  width: 100%;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  /* 關鍵：拿掉原本的 max-width 和 margin: 0 auto */
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
