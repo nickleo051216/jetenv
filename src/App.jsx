@@ -690,6 +690,8 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     version: 1,
     date: formatDate(new Date()),
     validUntil: formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
+    companyContact: '張惟荏',
+    companyPhone: '02-6609-5888 #103',
     clientName: '',
     clientTaxId: '',
     clientContact: '',
@@ -965,8 +967,36 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                         <div className="mt-4 text-sm text-gray-600 space-y-0.5 leading-relaxed">
                           <p>統一編號：<span className="font-medium">60779653</span></p>
                           <p>地　　址：新北市土城區金城路二段245巷40號1F</p>
-                          <p>電　　話：0988839649</p>
-                          <p>聯 絡 人：Nick Chang</p>
+{/* --- 修改開始：將電話改成可編輯 --- */}
+                          <div className="flex items-center">
+                            <span>電　　話：</span>
+                            {isPrintMode ? (
+                              <span>{formData.companyPhone}</span>
+                            ) : (
+                              <input 
+                                className="border-b border-gray-300 focus:border-teal-500 outline-none px-1 w-40 bg-transparent text-gray-600"
+                                value={formData.companyPhone || ''}
+                                onChange={(e) => setFormData({...formData, companyPhone: e.target.value})}
+                              />
+                            )}
+                          </div>
+                          {/* --- 修改結束 --- */}
+
+                          {/* --- 修改開始：將聯絡人改成可編輯 --- */}
+                          <div className="flex items-center">
+                            <span>聯 絡 人：</span>
+                            {isPrintMode ? (
+                              <span>{formData.companyContact}</span>
+                            ) : (
+                              <input 
+                                className="border-b border-gray-300 focus:border-teal-500 outline-none px-1 w-40 bg-transparent text-gray-600"
+                                value={formData.companyContact || ''}
+                                onChange={(e) => setFormData({...formData, companyContact: e.target.value})}
+                              />
+                            )}
+                          </div>
+                          {/* --- 修改結束 --- */}
+                        </div>
                         </div>
                       </div>
                     </div>
