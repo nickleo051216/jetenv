@@ -473,7 +473,7 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
   );
 };
 
-// --- Editor (V5.9: 智慧同步客戶資料) ---
+// --- Editor (V6.1: 使用 Table 結構 + 強制 CSS Reset) ---
 const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, isPrintMode }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -596,14 +596,12 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     }
   };
 
-  // V5.9: 智慧同步功能 (Smart Sync)
+  // 智慧同步功能 (Smart Sync)
   const syncCustomerData = async (clientName, data) => {
     if (!clientName) return;
     try {
-      // 1. 檢查客戶是否存在 (用名稱搜尋)
       const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), where("name", "==", clientName));
       const querySnapshot = await getDocs(q);
-      
       const customerPayload = {
         name: data.clientName,
         taxId: data.clientTaxId || '',
@@ -615,26 +613,38 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
       };
 
       if (!querySnapshot.empty) {
-        // 2a. 如果存在 -> 更新第一筆符合的資料
         const customerDoc = querySnapshot.docs[0];
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', customerDoc.id), customerPayload);
-        console.log(`[Smart Sync] 已更新客戶資料: ${clientName}`);
       } else {
-        // 2b. 如果不存在 -> 新增一筆
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), customerPayload);
-        console.log(`[Smart Sync] 已新增新客戶: ${clientName}`);
       }
-    } catch (e) {
-      console.error("[Smart Sync] 客戶同步失敗:", e);
-    }
+    } catch (e) { console.error("客戶同步失敗", e); }
+  };
+
+  const syncProductData = async (items) => {
+    if (!items || items.length === 0) return;
+    try {
+      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'products'));
+      const querySnapshot = await getDocs(q);
+      const existingProducts = querySnapshot.docs.map(d => d.data().name);
+      for (const item of items) {
+        if (item.name && !existingProducts.includes(item.name)) {
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
+            name: item.name,
+            spec: item.spec || '',
+            unit: item.unit || '式',
+            price: Number(item.price) || 0
+          });
+          existingProducts.push(item.name);
+        }
+      }
+    } catch (e) { console.error("產品同步失敗", e); }
   };
 
   const save = async (silent = false) => {
     if(!silent) setSaving(true);
     const payload = { ...formData, subtotal, tax, grandTotal, updatedAt: serverTimestamp() };
-    
     try {
-      // 1. 儲存報價單
       if (quoteId) {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', quoteId), payload);
       } else {
@@ -643,10 +653,8 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         });
         if(!quoteId) setActiveQuoteId(ref.id);
       }
-
-      // 2. 執行智慧同步 (更新通訊錄)
       await syncCustomerData(formData.clientName, formData);
-
+      await syncProductData(formData.items);
     } catch (e) { console.error(e); alert('儲存失敗'); }
     if(!silent) setSaving(false);
   };
@@ -715,7 +723,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         </div>
       )}
 
-      {/* --- Document Content (V5.8: 使用 table 結構以支援跨頁表頭) --- */}
+      {/* --- Document Content (V6.1: 使用 table 結構以支援跨頁表頭) --- */}
       <div className={`flex-1 ${isPrintMode ? 'p-0 w-full max-w-[210mm] mx-auto print-container' : 'p-8 sm:p-12'}`}>
         
         {/* Cancel Print Button */}
@@ -821,9 +829,17 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                       </div>
                     </div>
                   </header>
+                </div>
+              </td>
+            </tr>
+          </thead>
 
-                  {/* Client Info (在表頭區，每頁出現) */}
-                  <section className="mb-2">
+          {/* TBODY: 報價內容 + 客戶資料 + 頁尾 */}
+          <tbody>
+            <tr>
+              <td>
+                {/* Client Info */}
+                <section className="mb-2">
                     <div className="flex justify-between items-end mb-2 border-b border-gray-200 pb-1">
                       <h3 className="font-bold text-gray-700">客戶資料 Customer</h3>
                       {!isPrintMode && (
@@ -845,15 +861,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                       <div className="flex items-center col-span-2"><span className="w-20 text-gray-500">地址：</span>{isPrintMode ? <span className="flex-1 text-gray-900">{formData.clientAddress}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent" value={formData.clientAddress} onChange={e => setFormData({...formData, clientAddress: e.target.value})} />}</div>
                     </div>
                   </section>
-                </div>
-              </td>
-            </tr>
-          </thead>
 
-          {/* TBODY: 報價內容 */}
-          <tbody>
-            <tr>
-              <td>
                 <section className="mb-8 min-h-[300px]">
                   <table className="min-w-full divide-y divide-gray-300 border-t border-b border-gray-300">
                     <thead className="bg-teal-50">
@@ -930,14 +938,8 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                     </div>
                   )}
                 </section>
-              </td>
-            </tr>
-          </tbody>
-
-          {/* TFOOT: 頁尾合計與簽名 (只會出現在最後) */}
-          <tfoot>
-            <tr>
-              <td>
+              
+                {/* Footer Section: 合計與簽名 (放在 tbody 最後，避免佔用 tfoot 固定位置) */}
                 <div className="pt-4 page-break-inside-avoid">
                   <div className="flex flex-col md:flex-row gap-8 break-inside-avoid">
                     <div className="flex-1 space-y-4">
@@ -977,7 +979,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                 </div>
               </td>
             </tr>
-          </tfoot>
+          </tbody>
         </table>
       </div>
 
@@ -986,13 +988,25 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         .btn-secondary { @apply flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors border border-gray-300; }
         @media print {
           @page { margin: 10mm; size: A4 portrait; }
-          body { -webkit-print-color-adjust: exact; padding: 0; background: white; width: 100%; height: 100%; }
+          html, body, #root { 
+            height: auto !important; 
+            overflow: visible !important; 
+            min-height: 0 !important;
+            margin: 0; 
+            padding: 0; 
+          }
+          /* 暴力覆蓋 Tailwind 可能的 height: 100% */
+          .min-h-screen { min-height: 0 !important; }
+          
           .no-print { display: none !important; }
           .print-container { padding: 0; margin: 0; width: 100%; }
           .page-break-inside-avoid { page-break-inside: avoid; }
-          /* 讓 thead 每頁重複 */
-          thead { display: table-header-group; }
-          tfoot { display: table-footer-group; }
+          
+          /* 關鍵：表格分頁設定 */
+          table { width: 100%; border-collapse: collapse; }
+          thead { display: table-header-group !important; } /* 每頁重複表頭 */
+          tbody { display: table-row-group !important; }
+          tfoot { display: table-row-group !important; } /* 簽名欄不強制置底，隨內容結束 */
         }
       `}</style>
     </div>
