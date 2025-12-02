@@ -15,11 +15,13 @@ import {
   doc, 
   onSnapshot, 
   query, 
-  serverTimestamp
+  serverTimestamp,
+  where,
+  getDocs
 } from 'firebase/firestore';
 import { 
   Plus, Trash2, FileText, Users, Printer, Save, Copy, 
-  ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, Stamp, ListPlus, X, Search, Edit, RotateCcw, FileCheck, ClipboardList
+  ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, Stamp, ListPlus, X, Search, Edit, RotateCcw, FileCheck, ClipboardList, RefreshCw
 } from 'lucide-react';
 
 // --- 設定區：預設圖檔路徑 ---
@@ -99,7 +101,7 @@ const Spinner = () => (
   </div>
 );
 
-// --- Custom Input Components (V5.7: 支援列印模式純文字化) ---
+// --- Custom Input Components ---
 const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸入...", isPrintMode }) => {
   const isCustom = !options.includes(value) && value !== '';
   const [mode, setMode] = useState(isCustom ? 'custom' : 'select');
@@ -471,7 +473,7 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
   );
 };
 
-// --- Editor (V5.8: 使用 Table 結構實現固定表頭) ---
+// --- Editor (V5.9: 智慧同步客戶資料) ---
 const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, isPrintMode }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -594,10 +596,45 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     }
   };
 
+  // V5.9: 智慧同步功能 (Smart Sync)
+  const syncCustomerData = async (clientName, data) => {
+    if (!clientName) return;
+    try {
+      // 1. 檢查客戶是否存在 (用名稱搜尋)
+      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), where("name", "==", clientName));
+      const querySnapshot = await getDocs(q);
+      
+      const customerPayload = {
+        name: data.clientName,
+        taxId: data.clientTaxId || '',
+        contact: data.clientContact || '',
+        phone: data.clientPhone || '',
+        fax: data.clientFax || '',
+        address: data.clientAddress || '',
+        email: data.clientEmail || ''
+      };
+
+      if (!querySnapshot.empty) {
+        // 2a. 如果存在 -> 更新第一筆符合的資料
+        const customerDoc = querySnapshot.docs[0];
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', customerDoc.id), customerPayload);
+        console.log(`[Smart Sync] 已更新客戶資料: ${clientName}`);
+      } else {
+        // 2b. 如果不存在 -> 新增一筆
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), customerPayload);
+        console.log(`[Smart Sync] 已新增新客戶: ${clientName}`);
+      }
+    } catch (e) {
+      console.error("[Smart Sync] 客戶同步失敗:", e);
+    }
+  };
+
   const save = async (silent = false) => {
     if(!silent) setSaving(true);
     const payload = { ...formData, subtotal, tax, grandTotal, updatedAt: serverTimestamp() };
+    
     try {
+      // 1. 儲存報價單
       if (quoteId) {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', quoteId), payload);
       } else {
@@ -606,6 +643,10 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         });
         if(!quoteId) setActiveQuoteId(ref.id);
       }
+
+      // 2. 執行智慧同步 (更新通訊錄)
+      await syncCustomerData(formData.clientName, formData);
+
     } catch (e) { console.error(e); alert('儲存失敗'); }
     if(!silent) setSaving(false);
   };
