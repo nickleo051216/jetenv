@@ -365,9 +365,9 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
       result = result.filter(q => 
-        q.quoteNumber?.toLowerCase().includes(lower) ||
-        q.clientName?.toLowerCase().includes(lower) ||
-        q.projectName?.toLowerCase().includes(lower)
+        String(q.quoteNumber || '').toLowerCase().includes(lower) ||
+        String(q.clientName || '').toLowerCase().includes(lower) ||
+        String(q.projectName || '').toLowerCase().includes(lower)
       );
     }
     
@@ -1318,11 +1318,11 @@ const CustomerManager = () => {
     if (!searchTerm) return customers;
     const lower = searchTerm.toLowerCase();
     return customers.filter(c => 
-      c.name?.toLowerCase().includes(lower) ||
-      c.taxId?.toLowerCase().includes(lower) ||
-      c.contact?.toLowerCase().includes(lower) ||
-      c.phone?.toLowerCase().includes(lower) ||
-      c.address?.toLowerCase().includes(lower)
+      String(c.name || '').toLowerCase().includes(lower) ||
+      String(c.taxId || '').toLowerCase().includes(lower) ||
+      String(c.contact || '').toLowerCase().includes(lower) ||
+      String(c.phone || '').toLowerCase().includes(lower) ||
+      String(c.address || '').toLowerCase().includes(lower)
     );
   }, [customers, searchTerm]);
 
@@ -1505,9 +1505,9 @@ const ProductManager = () => {
     if (!searchTerm) return products;
     const lower = searchTerm.toLowerCase();
     return products.filter(p => 
-      p.name?.toLowerCase().includes(lower) ||
-      p.spec?.toLowerCase().includes(lower) ||
-      p.unit?.toLowerCase().includes(lower)
+      String(p.name || '').toLowerCase().includes(lower) ||
+      String(p.spec || '').toLowerCase().includes(lower) ||
+      String(p.unit || '').toLowerCase().includes(lower)
     );
   }, [products, searchTerm]);
 
