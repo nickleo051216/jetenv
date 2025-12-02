@@ -269,6 +269,7 @@ export default function App() {
             user={user} 
             onEdit={(id) => { setActiveQuoteId(id); setView('editor'); }} 
             onCreate={() => { setActiveQuoteId(null); setView('editor'); }}
+            onDuplicate={(id) => { setActiveQuoteId(id); setView('editor'); }}
           />
         )}
         {view === 'customers' && <CustomerManager />}
@@ -289,7 +290,7 @@ export default function App() {
 }
 
 // --- Dashboard ---
-const Dashboard = ({ user, onEdit, onCreate }) => {
+const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
   const [quotes, setQuotes] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -324,6 +325,35 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
     e.stopPropagation();
     if (confirm('確定要刪除此報價單嗎？')) {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', id));
+    }
+  };
+
+  // 複製報價單功能
+  const handleDuplicate = async (e, quote) => {
+    e.stopPropagation();
+    if (confirm(`確定要複製「${quote.projectName || quote.quoteNumber}」嗎？`)) {
+      const newQuote = {
+        ...quote,
+        quoteNumber: generateQuoteNumber(),
+        projectName: `${quote.projectName || '專案'} (複製)`,
+        status: 'draft',
+        version: 1,
+        date: formatDate(new Date()),
+        validUntil: formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      // 移除舊的 id
+      delete newQuote.id;
+      
+      try {
+        const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'), newQuote);
+        // 複製成功後直接進入編輯
+        onDuplicate(docRef.id);
+      } catch (err) {
+        console.error('複製失敗:', err);
+        alert('複製失敗，請稍後再試');
+      }
     }
   };
 
@@ -559,7 +589,7 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">最後編輯</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">狀態</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">總金額 (含稅)</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">操作</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">操作</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -598,9 +628,22 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
                       NT$ {quote.grandTotal?.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium">
-                      <button onClick={(e) => handleDelete(e, quote.id)} className="text-gray-400 hover:text-red-600 transition-colors p-2 hover:bg-gray-100 rounded-full">
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button 
+                          onClick={(e) => handleDuplicate(e, quote)} 
+                          className="text-gray-400 hover:text-teal-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                          title="複製此報價單"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={(e) => handleDelete(e, quote.id)} 
+                          className="text-gray-400 hover:text-red-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                          title="刪除"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -1232,6 +1275,8 @@ const CustomerManager = () => {
   const [customers, setCustomers] = useState([]);
   const [form, setForm] = useState({ name: '', taxId: '', contact: '', phone: '', fax: '', address: '', email: '' });
   const [editingId, setEditingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
 
   useEffect(() => {
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'customers'));
@@ -1242,19 +1287,62 @@ const CustomerManager = () => {
     return () => unsubscribe();
   }, []);
 
+  // 檢查重複
+  const checkDuplicate = (name, taxId) => {
+    if (!name && !taxId) {
+      setDuplicateWarning(null);
+      return;
+    }
+    
+    const duplicate = customers.find(c => {
+      if (editingId && c.id === editingId) return false; // 排除正在編輯的項目
+      if (name && c.name && c.name.toLowerCase() === name.toLowerCase()) return true;
+      if (taxId && c.taxId && c.taxId === taxId) return true;
+      return false;
+    });
+    
+    if (duplicate) {
+      setDuplicateWarning(`⚠️ 發現相似客戶：「${duplicate.name}」(統編: ${duplicate.taxId || '無'})`);
+    } else {
+      setDuplicateWarning(null);
+    }
+  };
+
+  // 監聽表單變化檢查重複
+  useEffect(() => {
+    checkDuplicate(form.name, form.taxId);
+  }, [form.name, form.taxId, customers, editingId]);
+
+  // 篩選客戶
+  const filteredCustomers = useMemo(() => {
+    if (!searchTerm) return customers;
+    const lower = searchTerm.toLowerCase();
+    return customers.filter(c => 
+      c.name?.toLowerCase().includes(lower) ||
+      c.taxId?.toLowerCase().includes(lower) ||
+      c.contact?.toLowerCase().includes(lower) ||
+      c.phone?.toLowerCase().includes(lower) ||
+      c.address?.toLowerCase().includes(lower)
+    );
+  }, [customers, searchTerm]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if(!form.name) return;
     
+    // 重複警告確認
+    if (duplicateWarning && !editingId) {
+      if (!confirm(`${duplicateWarning}\n\n確定仍要新增嗎？`)) return;
+    }
+    
     if (editingId) {
-      // Update Mode
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', editingId), form);
       setEditingId(null);
     } else {
-      // Create Mode
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), form);
     }
     setForm({ name: '', taxId: '', contact: '', phone: '', fax: '', address: '', email: '' });
+    setDuplicateWarning(null);
   };
 
   const handleEdit = (customer) => {
@@ -1265,12 +1353,16 @@ const CustomerManager = () => {
   const handleCancel = () => {
     setEditingId(null);
     setForm({ name: '', taxId: '', contact: '', phone: '', fax: '', address: '', email: '' });
+    setDuplicateWarning(null);
   };
   
-  const handleDelete = async (id) => { if(confirm('刪除?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', id)); };
+  const handleDelete = async (id) => { 
+    if(confirm('刪除此客戶？')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', id)); 
+  };
 
   return (
     <div className="space-y-6 w-full">
+      {/* 新增/編輯表單 */}
       <div className="bg-white p-6 rounded-lg shadow border border-gray-200 w-full">
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-bold text-lg text-teal-800 flex items-center">
@@ -1283,8 +1375,16 @@ const CustomerManager = () => {
             </button>
           )}
         </div>
+        
+        {/* 重複警告 */}
+        {duplicateWarning && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+            {duplicateWarning}
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input className="input-std md:col-span-2" placeholder="公司名稱" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+          <input className="input-std md:col-span-2" placeholder="公司名稱 *" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
           <input className="input-std" placeholder="統一編號" value={form.taxId} onChange={e=>setForm({...form, taxId:e.target.value})} />
           <input className="input-std" placeholder="聯絡人" value={form.contact} onChange={e=>setForm({...form, contact:e.target.value})} />
           <input className="input-std" placeholder="電話" value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})} />
@@ -1297,32 +1397,60 @@ const CustomerManager = () => {
         </form>
       </div>
       
+      {/* 搜尋與統計 */}
+      <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+        <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
+          <div className="relative w-full md:w-64">
+            <input 
+              type="text" 
+              placeholder="搜尋客戶名稱、統編、聯絡人..." 
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+          </div>
+          <div className="text-sm text-gray-500">
+            共 <span className="font-bold text-teal-600">{filteredCustomers.length}</span> 位客戶
+            {searchTerm && ` (篩選自 ${customers.length} 筆)`}
+          </div>
+        </div>
+      </div>
+      
+      {/* 客戶列表 */}
       <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200 w-full">
         <table className="min-w-full divide-y divide-gray-200 w-full">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">公司 / 統編</th>
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">聯絡資訊</th>
-              <th className="px-4 py-3 text-right"></th>
+              <th className="px-4 py-3 text-right w-24"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {customers.map(c => (
-              <tr key={c.id} className={editingId === c.id ? 'bg-orange-50' : ''}>
+            {filteredCustomers.map(c => (
+              <tr key={c.id} className={editingId === c.id ? 'bg-orange-50' : 'hover:bg-gray-50'}>
                 <td className="px-4 py-3">
                   <div className="font-bold text-gray-900">{c.name}</div>
-                  <div className="text-xs text-gray-500">{c.taxId}</div>
+                  <div className="text-xs text-gray-500">{c.taxId || '(無統編)'}</div>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
                   <div>{c.contact} / {c.phone}</div>
-                  <div className="text-xs text-gray-400">{c.address}</div>
+                  <div className="text-xs text-gray-400 truncate max-w-xs">{c.address}</div>
                 </td>
                 <td className="px-4 py-3 text-right space-x-2">
-                  <button onClick={() => handleEdit(c)} className="text-gray-400 hover:text-orange-500"><Edit className="w-4 h-4" /></button>
-                  <button onClick={() => handleDelete(c.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={() => handleEdit(c)} className="text-gray-400 hover:text-orange-500 p-1"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => handleDelete(c.id)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
                 </td>
               </tr>
             ))}
+            {filteredCustomers.length === 0 && (
+              <tr>
+                <td colSpan="3" className="px-4 py-8 text-center text-gray-500">
+                  {searchTerm ? '沒有符合搜尋條件的客戶' : '尚無客戶資料'}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -1336,6 +1464,8 @@ const ProductManager = () => {
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({ name: '', spec: '', unit: '式', price: 0 });
   const [editingId, setEditingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
 
   useEffect(() => {
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'products'));
@@ -1346,9 +1476,49 @@ const ProductManager = () => {
     return () => unsubscribe();
   }, []);
 
+  // 檢查重複
+  const checkDuplicate = (name) => {
+    if (!name) {
+      setDuplicateWarning(null);
+      return;
+    }
+    
+    const duplicate = products.find(p => {
+      if (editingId && p.id === editingId) return false; // 排除正在編輯的項目
+      return p.name && p.name.toLowerCase() === name.toLowerCase();
+    });
+    
+    if (duplicate) {
+      setDuplicateWarning(`⚠️ 發現相同名稱：「${duplicate.name}」(單價: NT$${duplicate.price}/${duplicate.unit})`);
+    } else {
+      setDuplicateWarning(null);
+    }
+  };
+
+  // 監聽表單變化檢查重複
+  useEffect(() => {
+    checkDuplicate(form.name);
+  }, [form.name, products, editingId]);
+
+  // 篩選產品
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm) return products;
+    const lower = searchTerm.toLowerCase();
+    return products.filter(p => 
+      p.name?.toLowerCase().includes(lower) ||
+      p.spec?.toLowerCase().includes(lower) ||
+      p.unit?.toLowerCase().includes(lower)
+    );
+  }, [products, searchTerm]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if(!form.name) return;
+    
+    // 重複警告確認
+    if (duplicateWarning && !editingId) {
+      if (!confirm(`${duplicateWarning}\n\n確定仍要新增嗎？`)) return;
+    }
     
     const payload = { ...form, price: Number(form.price) };
 
@@ -1359,6 +1529,7 @@ const ProductManager = () => {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), payload);
     }
     setForm({ name: '', spec: '', unit: '式', price: 0 });
+    setDuplicateWarning(null);
   };
 
   const handleEdit = (product) => {
@@ -1369,12 +1540,27 @@ const ProductManager = () => {
   const handleCancel = () => {
     setEditingId(null);
     setForm({ name: '', spec: '', unit: '式', price: 0 });
+    setDuplicateWarning(null);
   };
   
-  const handleDelete = async (id) => { if(confirm('刪除?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id)); };
+  const handleDelete = async (id) => { 
+    if(confirm('刪除此產品/服務？')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id)); 
+  };
+
+  // 複製產品
+  const handleDuplicate = async (product) => {
+    const newProduct = {
+      name: `${product.name} (複製)`,
+      spec: product.spec || '',
+      unit: product.unit || '式',
+      price: Number(product.price) || 0
+    };
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), newProduct);
+  };
 
   return (
     <div className="space-y-6 w-full">
+      {/* 新增/編輯表單 */}
       <div className="bg-white p-6 rounded-lg shadow border border-gray-200 w-full">
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-bold text-lg text-teal-800 flex items-center">
@@ -1387,17 +1573,46 @@ const ProductManager = () => {
             </button>
           )}
         </div>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <input className="input-std md:col-span-2" placeholder="產品/服務名稱" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
-          <input className="input-std" placeholder="規格/備註" value={form.spec} onChange={e=>setForm({...form, spec:e.target.value})} />
-          <input className="input-std w-20" placeholder="單位" value={form.unit} onChange={e=>setForm({...form, unit:e.target.value})} />
-          <input className="input-std w-24" type="number" placeholder="單價" value={form.price} onChange={e=>setForm({...form, price:e.target.value})} />
-          <button className={`text-white py-2 px-4 rounded hover:opacity-90 ${editingId ? 'bg-orange-500' : 'bg-teal-600'}`}>
+        
+        {/* 重複警告 */}
+        {duplicateWarning && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+            {duplicateWarning}
+          </div>
+        )}
+        
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <input className="input-std md:col-span-2" placeholder="產品/服務名稱 *" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+          <input className="input-std md:col-span-2" placeholder="規格/備註" value={form.spec} onChange={e=>setForm({...form, spec:e.target.value})} />
+          <input className="input-std" placeholder="單位" value={form.unit} onChange={e=>setForm({...form, unit:e.target.value})} />
+          <input className="input-std" type="number" placeholder="單價" value={form.price} onChange={e=>setForm({...form, price:e.target.value})} />
+          <button className={`text-white py-2 px-4 rounded md:col-span-6 transition-colors ${editingId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-teal-600 hover:bg-teal-700'}`}>
             {editingId ? '更新' : '新增'}
           </button>
         </form>
       </div>
       
+      {/* 搜尋與統計 */}
+      <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+        <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
+          <div className="relative w-full md:w-64">
+            <input 
+              type="text" 
+              placeholder="搜尋產品名稱、規格..." 
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+          </div>
+          <div className="text-sm text-gray-500">
+            共 <span className="font-bold text-teal-600">{filteredProducts.length}</span> 項產品/服務
+            {searchTerm && ` (篩選自 ${products.length} 筆)`}
+          </div>
+        </div>
+      </div>
+      
+      {/* 產品列表 */}
       <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200 w-full">
         <table className="min-w-full divide-y divide-gray-200 w-full">
           <thead className="bg-gray-50">
@@ -1405,21 +1620,29 @@ const ProductManager = () => {
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">項目</th>
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">規格</th>
               <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">參考單價</th>
-              <th className="px-4 py-3 text-right"></th>
+              <th className="px-4 py-3 text-right w-28"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {products.map(p => (
-              <tr key={p.id} className={editingId === p.id ? 'bg-orange-50' : ''}>
+            {filteredProducts.map(p => (
+              <tr key={p.id} className={editingId === p.id ? 'bg-orange-50' : 'hover:bg-gray-50'}>
                 <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{p.spec}</td>
-                <td className="px-4 py-3 text-right text-sm text-gray-900">NT$ {p.price} / {p.unit}</td>
-                <td className="px-4 py-3 text-right space-x-2">
-                  <button onClick={() => handleEdit(p)} className="text-gray-400 hover:text-orange-500"><Edit className="w-4 h-4" /></button>
-                  <button onClick={() => handleDelete(p.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                <td className="px-4 py-3 text-sm text-gray-500 truncate max-w-xs">{p.spec || '-'}</td>
+                <td className="px-4 py-3 text-right text-sm text-gray-900">NT$ {p.price?.toLocaleString()} / {p.unit}</td>
+                <td className="px-4 py-3 text-right space-x-1">
+                  <button onClick={() => handleDuplicate(p)} className="text-gray-400 hover:text-teal-500 p-1" title="複製"><Copy className="w-4 h-4" /></button>
+                  <button onClick={() => handleEdit(p)} className="text-gray-400 hover:text-orange-500 p-1" title="編輯"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => handleDelete(p.id)} className="text-gray-400 hover:text-red-500 p-1" title="刪除"><Trash2 className="w-4 h-4" /></button>
                 </td>
               </tr>
             ))}
+            {filteredProducts.length === 0 && (
+              <tr>
+                <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
+                  {searchTerm ? '沒有符合搜尋條件的產品' : '尚無產品/服務資料'}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
