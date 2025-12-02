@@ -291,9 +291,14 @@ export default function App() {
 // --- Dashboard ---
 const Dashboard = ({ user, onEdit, onCreate }) => {
   const [quotes, setQuotes] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('quotes');
+  
+  // 新增篩選狀態
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [customerFilter, setCustomerFilter] = useState('all');
 
   useEffect(() => {
     document.title = "傑太環境工程報價系統";
@@ -304,7 +309,15 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
       setQuotes(docs);
       setLoading(false);
     });
-    return () => unsubscribe();
+    
+    // 載入客戶列表用於篩選
+    const qCustomers = query(collection(db, 'artifacts', appId, 'public', 'data', 'customers'));
+    const unsubCustomers = onSnapshot(qCustomers, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCustomers(docs);
+    });
+    
+    return () => { unsubscribe(); unsubCustomers(); };
   }, []);
 
   const handleDelete = async (e, id) => {
@@ -314,8 +327,11 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
     }
   };
 
+  // 篩選邏輯
   const filteredQuotes = useMemo(() => {
     let result = quotes;
+    
+    // 搜尋篩選
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
       result = result.filter(q => 
@@ -324,9 +340,21 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
         q.projectName?.toLowerCase().includes(lower)
       );
     }
+    
+    // 狀態篩選
+    if (statusFilter !== 'all') {
+      result = result.filter(q => q.status === statusFilter);
+    }
+    
+    // 客戶篩選
+    if (customerFilter !== 'all') {
+      result = result.filter(q => q.clientName === customerFilter);
+    }
+    
     return result;
-  }, [quotes, searchTerm]);
+  }, [quotes, searchTerm, statusFilter, customerFilter]);
 
+  // Tab 篩選
   const tabFilteredQuotes = useMemo(() => {
     return filteredQuotes.filter(q => {
       if (activeTab === 'quotes') {
@@ -337,6 +365,26 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
     });
   }, [filteredQuotes, activeTab]);
 
+  // 計算統計數據
+  const stats = useMemo(() => {
+    const inProgress = filteredQuotes.filter(q => ['draft', 'sent', 'confirmed', 'cancelled'].includes(q.status) || !q.status);
+    const ordered = filteredQuotes.filter(q => q.status === 'ordered');
+    
+    return {
+      inProgressCount: inProgress.length,
+      inProgressTotal: inProgress.reduce((sum, q) => sum + (q.grandTotal || 0), 0),
+      orderedCount: ordered.length,
+      orderedTotal: ordered.reduce((sum, q) => sum + (q.grandTotal || 0), 0),
+      allTotal: filteredQuotes.reduce((sum, q) => sum + (q.grandTotal || 0), 0)
+    };
+  }, [filteredQuotes]);
+
+  // 取得唯一客戶列表（用於篩選下拉選單）
+  const uniqueClients = useMemo(() => {
+    const clients = [...new Set(quotes.map(q => q.clientName).filter(Boolean))];
+    return clients.sort();
+  }, [quotes]);
+
   const statusConfig = {
     draft: { label: '草稿', color: 'bg-gray-100 text-gray-600 border-gray-200' },
     sent: { label: '已發送', color: 'bg-blue-50 text-blue-600 border-blue-200' },
@@ -345,6 +393,14 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
     cancelled: { label: '已取消', color: 'bg-red-50 text-red-600 border-red-200' },
   };
 
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setCustomerFilter('all');
+  };
+
+  const hasActiveFilters = searchTerm || statusFilter !== 'all' || customerFilter !== 'all';
+
   if (loading) return <Spinner />;
 
   return (
@@ -352,7 +408,60 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-800 border-l-4 border-teal-600 pl-3">專案報價管理</h2>
         
-        <div className="flex flex-1 w-full md:w-auto gap-2 justify-end">
+        <button 
+          onClick={onCreate}
+          className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 shadow-sm transition-colors whitespace-nowrap"
+        >
+          <Plus className="w-5 h-5 mr-1" /> 建立新報價
+        </button>
+      </div>
+
+      {/* 統計卡片 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">進行中報價</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.inProgressCount} 件</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-400">總金額</p>
+              <p className="text-lg font-bold text-teal-600">NT$ {stats.inProgressTotal.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow border border-green-200 p-4 bg-green-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-green-600">已回簽訂單</p>
+              <p className="text-2xl font-bold text-green-800">{stats.orderedCount} 件</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-green-500">總金額</p>
+              <p className="text-lg font-bold text-green-700">NT$ {stats.orderedTotal.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow border border-teal-200 p-4 bg-teal-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-teal-600">全部案件</p>
+              <p className="text-2xl font-bold text-teal-800">{filteredQuotes.length} 件</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-teal-500">總金額</p>
+              <p className="text-lg font-bold text-teal-700">NT$ {stats.allTotal.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 搜尋與篩選列 */}
+      <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+        <div className="flex flex-col md:flex-row gap-3 items-start md:items-center">
+          {/* 搜尋框 */}
           <div className="relative w-full md:w-64">
             <input 
               type="text" 
@@ -363,13 +472,56 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
             />
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
           </div>
-          <button 
-            onClick={onCreate}
-            className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 shadow-sm transition-colors whitespace-nowrap"
-          >
-            <Plus className="w-5 h-5 mr-1" /> 建立新報價
-          </button>
+          
+          {/* 狀態篩選 */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-500 whitespace-nowrap">狀態：</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            >
+              <option value="all">全部狀態</option>
+              <option value="draft">草稿</option>
+              <option value="sent">已發送</option>
+              <option value="confirmed">已確認</option>
+              <option value="ordered">已轉訂單</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </div>
+          
+          {/* 客戶篩選 */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-500 whitespace-nowrap">客戶：</label>
+            <select
+              value={customerFilter}
+              onChange={(e) => setCustomerFilter(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 max-w-[200px]"
+            >
+              <option value="all">全部客戶</option>
+              {uniqueClients.map(client => (
+                <option key={client} value={client}>{client}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* 清除篩選按鈕 */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center text-sm text-gray-500 hover:text-red-500 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              <X className="w-4 h-4 mr-1" /> 清除篩選
+            </button>
+          )}
         </div>
+        
+        {/* 顯示篩選結果數量 */}
+        {hasActiveFilters && (
+          <div className="mt-3 text-sm text-gray-500">
+            篩選結果：共 <span className="font-bold text-teal-600">{filteredQuotes.length}</span> 筆資料
+          </div>
+        )}
       </div>
 
       <div className="flex border-b border-gray-200">
@@ -382,7 +534,7 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
           }`}
         >
           <ClipboardList className="w-4 h-4 mr-2" />
-          進行中報價 ({filteredQuotes.filter(q => ['draft', 'sent', 'confirmed', 'cancelled'].includes(q.status) || !q.status).length})
+          進行中報價 ({stats.inProgressCount})
         </button>
         <button
           onClick={() => setActiveTab('orders')}
@@ -393,7 +545,7 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
           }`}
         >
           <FileCheck className="w-4 h-4 mr-2" />
-          已回簽訂單 ({filteredQuotes.filter(q => q.status === 'ordered').length})
+          已回簽訂單 ({stats.orderedCount})
         </button>
       </div>
 
@@ -460,7 +612,12 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
                       <div className="bg-gray-100 p-3 rounded-full mb-3">
                         {activeTab === 'quotes' ? <ClipboardList className="w-6 h-6 text-gray-400" /> : <FileCheck className="w-6 h-6 text-gray-400" />}
                       </div>
-                      <p>此分類目前沒有資料</p>
+                      <p>{hasActiveFilters ? '沒有符合篩選條件的資料' : '此分類目前沒有資料'}</p>
+                      {hasActiveFilters && (
+                        <button onClick={clearFilters} className="mt-2 text-sm text-teal-600 hover:underline">
+                          清除所有篩選
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -863,16 +1020,16 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                   </section>
 
                 <section className="mb-8 min-h-[300px]">
-                  <table className="min-w-full divide-y divide-gray-300 border-t border-b border-gray-300">
+                  <table className="min-w-full divide-y divide-gray-300 border-t border-b border-gray-300 table-fixed">
                     <thead className="bg-teal-50">
                       <tr>
                         <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 w-10">No.</th>
-                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 w-1/4">項目名稱</th>
-                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 w-1/4">規格描述 / 備註</th>
+                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800" style={{width: '25%', minWidth: '120px'}}>項目名稱</th>
+                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800" style={{width: '25%', minWidth: '120px'}}>規格描述 / 備註</th>
                         <th className="px-2 py-2 text-center text-xs font-bold text-teal-800 w-16">頻率</th>
                         <th className="px-2 py-2 text-center text-xs font-bold text-teal-800 w-14">單位</th>
-                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-20">數量</th>
-                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-24">單價</th>
+                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-16">數量</th>
+                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-20">單價</th>
                         <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-24">複價(NT$)</th>
                         {!isPrintMode && <th className="px-2 py-2 w-8"></th>}
                       </tr>
@@ -885,27 +1042,39 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                             {isPrintMode ? (
                               <div className="w-full text-sm font-bold text-gray-900 whitespace-pre-wrap">{item.name}</div>
                             ) : (
-                              <textarea className="w-full border-0 p-1 text-sm font-bold text-gray-900 focus:ring-0 resize-none bg-transparent" rows={1} value={item.name} onChange={e => handleItemChange(item.id, 'name', e.target.value)} />
+                              <textarea 
+                                className="w-full border border-gray-200 rounded p-2 text-sm font-bold text-gray-900 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white transition-colors" 
+                                style={{resize: 'both', minHeight: '60px', minWidth: '100px'}}
+                                value={item.name} 
+                                onChange={e => handleItemChange(item.id, 'name', e.target.value)}
+                                placeholder="輸入項目名稱..."
+                              />
                             )}
                           </td>
                           <td className="px-2 py-2 align-top">
                             {isPrintMode ? (
                               <div className="w-full text-xs text-gray-600 whitespace-pre-wrap">{item.spec}</div>
                             ) : (
-                              <textarea className="w-full border-0 p-1 text-xs text-gray-600 focus:ring-0 resize-none bg-transparent placeholder-gray-300" rows={2} value={item.spec} onChange={e => handleItemChange(item.id, 'spec', e.target.value)} />
+                              <textarea 
+                                className="w-full border border-gray-200 rounded p-2 text-xs text-gray-600 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white transition-colors placeholder-gray-300" 
+                                style={{resize: 'both', minHeight: '60px', minWidth: '100px'}}
+                                value={item.spec} 
+                                onChange={e => handleItemChange(item.id, 'spec', e.target.value)}
+                                placeholder="輸入規格描述或備註..."
+                              />
                             )}
                           </td>
                           <td className="px-2 py-2 align-top">
-                            {isPrintMode ? <div className="w-full text-center text-xs text-gray-900">{item.frequency}</div> : <input className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent" value={item.frequency} onChange={e => handleItemChange(item.id, 'frequency', e.target.value)} />}
+                            {isPrintMode ? <div className="w-full text-center text-xs text-gray-900">{item.frequency}</div> : <input className="w-full text-center border border-gray-200 rounded p-1 text-xs text-gray-900 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white" value={item.frequency} onChange={e => handleItemChange(item.id, 'frequency', e.target.value)} placeholder="次/月" />}
                           </td>
                           <td className="px-2 py-2 align-top">
-                            {isPrintMode ? <div className="w-full text-center text-xs text-gray-900">{item.unit}</div> : <input className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent" value={item.unit} onChange={e => handleItemChange(item.id, 'unit', e.target.value)} />}
+                            {isPrintMode ? <div className="w-full text-center text-xs text-gray-900">{item.unit}</div> : <input className="w-full text-center border border-gray-200 rounded p-1 text-xs text-gray-900 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white" value={item.unit} onChange={e => handleItemChange(item.id, 'unit', e.target.value)} />}
                           </td>
                           <td className="px-2 py-2 align-top">
-                            {isPrintMode ? <div className="w-full text-right text-sm text-gray-900">{item.qty}</div> : <input type="number" className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500" value={item.qty} onChange={e => handleItemChange(item.id, 'qty', Number(e.target.value))} />}
+                            {isPrintMode ? <div className="w-full text-right text-sm text-gray-900">{item.qty}</div> : <input type="number" className="w-full text-right border border-gray-200 rounded p-1 text-sm text-gray-900 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white" value={item.qty} onChange={e => handleItemChange(item.id, 'qty', Number(e.target.value))} />}
                           </td>
                           <td className="px-2 py-2 align-top">
-                            {isPrintMode ? <div className="w-full text-right text-sm text-gray-900">{item.price}</div> : <input type="number" className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500" value={item.price} onChange={e => handleItemChange(item.id, 'price', Number(e.target.value))} />}
+                            {isPrintMode ? <div className="w-full text-right text-sm text-gray-900">{item.price?.toLocaleString()}</div> : <input type="number" className="w-full text-right border border-gray-200 rounded p-1 text-sm text-gray-900 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white" value={item.price} onChange={e => handleItemChange(item.id, 'price', Number(e.target.value))} />}
                           </td>
                           <td className="px-2 py-2 text-right text-sm font-medium text-gray-900 align-top pt-3">
                             {(item.price * item.qty).toLocaleString()}
@@ -982,12 +1151,12 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           </tbody>
         </table>
 
-        {/* 列印頁尾 - 每頁底部顯示網址與頁碼 */}
+        {/* 列印頁尾 - 每頁底部顯示網址 */}
         <div className="print-footer">
           <div className="print-footer-content">
             <span className="print-footer-url">https://www.jetenv.com.tw/</span>
             <span className="print-footer-company">傑太環境工程顧問有限公司</span>
-            <span className="print-footer-page"></span>
+            <span className="print-footer-page">{formData.quoteNumber}</span>
           </div>
         </div>
       </div>
@@ -1003,7 +1172,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         
         @media print {
           @page { 
-            margin: 10mm 10mm 20mm 10mm; /* 底部留更多空間給頁尾 */
+            margin: 10mm 10mm 20mm 10mm;
             size: A4 portrait; 
           }
           html, body, #root { 
@@ -1051,9 +1220,6 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           .print-footer-company {
             color: #9ca3af;
             font-size: 8pt;
-          }
-          .print-footer-page::after {
-            content: "第 " counter(page) " 頁 / 共 " counter(pages) " 頁";
           }
         }
       `}</style>
