@@ -999,7 +999,6 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                         </div>
                         </div>
                       </div>
-                    </div>
 
                     <div className="w-1/3 text-right">
                       <div className="inline-block text-left w-full">
