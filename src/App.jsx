@@ -473,7 +473,7 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
   );
 };
 
-// --- Editor (V6.1: 使用 Table 結構 + 強制 CSS Reset) ---
+// --- Editor (V6.2: 加入列印頁尾 - 網址 + 頁碼) ---
 const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, isPrintMode }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -723,7 +723,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         </div>
       )}
 
-      {/* --- Document Content (V6.1: 使用 table 結構以支援跨頁表頭) --- */}
+      {/* --- Document Content (V6.2: 使用 table 結構 + 列印頁尾) --- */}
       <div className={`flex-1 ${isPrintMode ? 'p-0 w-full max-w-[210mm] mx-auto print-container' : 'p-8 sm:p-12'}`}>
         
         {/* Cancel Print Button */}
@@ -981,13 +981,31 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
             </tr>
           </tbody>
         </table>
+
+        {/* 列印頁尾 - 每頁底部顯示網址與頁碼 */}
+        <div className="print-footer">
+          <div className="print-footer-content">
+            <span className="print-footer-url">https://www.jetenv.com.tw/</span>
+            <span className="print-footer-company">傑太環境工程顧問有限公司</span>
+            <span className="print-footer-page"></span>
+          </div>
+        </div>
       </div>
 
       <style>{`
         .btn-primary { @apply flex items-center px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 shadow-sm transition-colors; }
         .btn-secondary { @apply flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors border border-gray-300; }
+        
+        /* 頁尾：平常隱藏，列印時顯示 */
+        .print-footer {
+          display: none;
+        }
+        
         @media print {
-          @page { margin: 10mm; size: A4 portrait; }
+          @page { 
+            margin: 10mm 10mm 20mm 10mm; /* 底部留更多空間給頁尾 */
+            size: A4 portrait; 
+          }
           html, body, #root { 
             height: auto !important; 
             overflow: visible !important; 
@@ -995,18 +1013,48 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
             margin: 0; 
             padding: 0; 
           }
-          /* 暴力覆蓋 Tailwind 可能的 height: 100% */
           .min-h-screen { min-height: 0 !important; }
           
           .no-print { display: none !important; }
           .print-container { padding: 0; margin: 0; width: 100%; }
           .page-break-inside-avoid { page-break-inside: avoid; }
           
-          /* 關鍵：表格分頁設定 */
+          /* 表格分頁設定 */
           table { width: 100%; border-collapse: collapse; }
-          thead { display: table-header-group !important; } /* 每頁重複表頭 */
+          thead { display: table-header-group !important; }
           tbody { display: table-row-group !important; }
-          tfoot { display: table-row-group !important; } /* 簽名欄不強制置底，隨內容結束 */
+          tfoot { display: table-row-group !important; }
+          
+          /* 列印頁尾：固定在每頁底部 */
+          .print-footer {
+            display: block;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 14mm;
+            padding: 3mm 10mm;
+            border-top: 1px solid #d1d5db;
+            background: white;
+            font-size: 9pt;
+            color: #6b7280;
+          }
+          .print-footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .print-footer-url {
+            color: #0d9488;
+            font-weight: 600;
+          }
+          .print-footer-company {
+            color: #9ca3af;
+            font-size: 8pt;
+          }
+          .print-footer-page::after {
+            content: "第 " counter(page) " 頁 / 共 " counter(pages) " 頁";
+          }
         }
       `}</style>
     </div>
