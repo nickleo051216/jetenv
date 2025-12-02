@@ -112,7 +112,6 @@ const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸
     }
   }, [value, options]);
 
-  // 列印模式：只顯示純文字，沒有標籤和下拉選單
   if (isPrintMode) {
     return (
       <div className="w-full mb-2">
@@ -175,7 +174,6 @@ const NoteSelector = ({ value, onChange, isPrintMode }) => {
     }
   };
 
-  // 列印模式：只顯示純文字，支援換行
   if (isPrintMode) {
     return (
       <div className="w-full mt-4">
@@ -473,7 +471,7 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
   );
 };
 
-// --- Editor ---
+// --- Editor (V5.8: 使用 Table 結構實現固定表頭) ---
 const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, isPrintMode }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -676,10 +674,10 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         </div>
       )}
 
-      {/* --- Document --- */}
-      <div className={`flex-1 ${isPrintMode ? 'p-0 w-full max-w-[210mm] mx-auto' : 'p-8 sm:p-12'}`}>
+      {/* --- Document Content (V5.8: 使用 table 結構以支援跨頁表頭) --- */}
+      <div className={`flex-1 ${isPrintMode ? 'p-0 w-full max-w-[210mm] mx-auto print-container' : 'p-8 sm:p-12'}`}>
         
-        {/* Print Mode Cancel Button (Visible only on Screen) */}
+        {/* Cancel Print Button */}
         {isPrintMode && (
           <div className="no-print fixed top-4 right-4 z-50">
             <button 
@@ -691,401 +689,269 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           </div>
         )}
 
-        {/* Header with Logo */}
-        <header className="flex justify-between items-start mb-8 border-b-2 border-teal-700 pb-6 relative">
-          <div className="flex gap-6">
-            {/* Logo Area */}
-            <div className="relative group">
-              <img 
-                src={logoPreview} 
-                alt="Company Logo" 
-                className="h-24 w-auto object-contain"
-                onError={(e) => { e.target.style.display='none'; }}
-              />
-              
-              {!isPrintMode && (
-                <label className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-10 cursor-pointer transition-all">
-                  <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setLogoPreview)} className="hidden" />
-                </label>
-              )}
-            </div>
+        <table className="w-full">
+          {/* THEAD: 這是會每頁重複出現的表頭 */}
+          <thead>
+            <tr>
+              <td>
+                <div className="pb-6"> {/* 表頭內容 */}
+                  <header className="flex justify-between items-start mb-4 border-b-2 border-teal-700 pb-4 relative">
+                    <div className="flex gap-6">
+                      <div className="relative group">
+                        <img 
+                          src={logoPreview} 
+                          alt="Company Logo" 
+                          className="h-24 w-auto object-contain"
+                          onError={(e) => { e.target.style.display='none'; }}
+                        />
+                        {!isPrintMode && (
+                          <label className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-10 cursor-pointer transition-all">
+                            <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setLogoPreview)} className="hidden" />
+                          </label>
+                        )}
+                      </div>
+                      <div className="pt-1">
+                        <h1 className="text-3xl font-bold text-teal-900 tracking-wider mb-2">報 價 單</h1>
+                        <h2 className="text-lg font-bold text-gray-700">傑太環境工程顧問有限公司</h2>
+                        <div className="mt-4 text-sm text-gray-600 space-y-0.5 leading-relaxed">
+                          <p>統一編號：<span className="font-medium">60779653</span></p>
+                          <p>地　　址：新北市土城區金城路二段245巷40號1F</p>
+                          <p>電　　話：0988839649</p>
+                          <p>聯 絡 人：Nick Chang</p>
+                        </div>
+                      </div>
+                    </div>
 
-            <div className="pt-1">
-              <h1 className="text-3xl font-bold text-teal-900 tracking-wider mb-2">報 價 單</h1>
-              <h2 className="text-lg font-bold text-gray-700">傑太環境工程顧問有限公司</h2>
-              <div className="mt-4 text-sm text-gray-600 space-y-0.5 leading-relaxed">
-                <p>統一編號：<span className="font-medium">60779653</span></p>
-                <p>地　　址：新北市土城區金城路二段245巷40號1F</p>
-                <p>電　　話：0988839649</p>
-                <p>聯 絡 人：Nick Chang</p>
-              </div>
-            </div>
-          </div>
+                    <div className="w-1/3 text-right">
+                      <div className="inline-block text-left w-full">
+                        <div className="grid grid-cols-3 gap-y-2 text-sm items-center mb-4">
+                          <div className="contents">
+                            <span className="text-gray-500 font-medium">報價單號：</span>
+                            {isPrintMode ? (
+                              <span className="col-span-2 text-right font-bold text-teal-700">{formData.quoteNumber}</span>
+                            ) : (
+                              <input 
+                                className="col-span-2 text-right font-bold text-teal-700 border-none p-0 bg-transparent focus:ring-0"
+                                value={formData.quoteNumber}
+                                onChange={e => setFormData({...formData, quoteNumber: e.target.value})}
+                              />
+                            )}
+                          </div>
+                          <div className="contents">
+                            <span className="text-gray-500 font-medium">報價日期：</span>
+                            {isPrintMode ? (
+                              <span className="col-span-2 text-right text-gray-800">{formData.date}</span>
+                            ) : (
+                              <input 
+                                type="date"
+                                className="col-span-2 text-right border-none p-0 bg-transparent focus:ring-0 text-gray-800"
+                                value={formData.date}
+                                onChange={e => setFormData({...formData, date: e.target.value})}
+                              />
+                            )}
+                          </div>
+                          <div className="contents">
+                            <span className="text-gray-500 font-medium">有效期限：</span>
+                            {isPrintMode ? (
+                              <span className="col-span-2 text-right text-gray-800">{formData.validUntil}</span>
+                            ) : (
+                              <input 
+                                type="date"
+                                className="col-span-2 text-right border-none p-0 bg-transparent focus:ring-0 text-gray-800"
+                                value={formData.validUntil}
+                                onChange={e => setFormData({...formData, validUntil: e.target.value})}
+                              />
+                            )}
+                          </div>
+                        </div>
+                        <div className="bg-teal-50 p-3 rounded border border-teal-100">
+                          <label className="block text-xs font-bold text-teal-800 mb-1">專案名稱 Project Name</label>
+                          {isPrintMode ? (
+                            <div className="text-sm font-medium text-teal-900">{formData.projectName}</div>
+                          ) : (
+                            <input 
+                              className="w-full bg-white border border-teal-200 rounded px-2 py-1 text-sm focus:border-teal-500 focus:ring-teal-500"
+                              placeholder="請輸入專案名稱..."
+                              value={formData.projectName}
+                              onChange={e => setFormData({...formData, projectName: e.target.value})}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </header>
 
-          <div className="w-1/3 text-right">
-            <div className="inline-block text-left w-full">
-              <div className="grid grid-cols-3 gap-y-2 text-sm items-center mb-4">
-                <div className="contents">
-                  <span className="text-gray-500 font-medium">報價單號：</span>
-                  {isPrintMode ? (
-                    <span className="col-span-2 text-right font-bold text-teal-700">{formData.quoteNumber}</span>
-                  ) : (
-                    <input 
-                      className="col-span-2 text-right font-bold text-teal-700 border-none p-0 bg-transparent focus:ring-0"
-                      value={formData.quoteNumber}
-                      onChange={e => setFormData({...formData, quoteNumber: e.target.value})}
-                    />
-                  )}
+                  {/* Client Info (在表頭區，每頁出現) */}
+                  <section className="mb-2">
+                    <div className="flex justify-between items-end mb-2 border-b border-gray-200 pb-1">
+                      <h3 className="font-bold text-gray-700">客戶資料 Customer</h3>
+                      {!isPrintMode && (
+                          <select 
+                            className="text-xs border-gray-300 rounded py-1 pl-2 pr-8 shadow-sm focus:border-teal-500 focus:ring-teal-500"
+                            onChange={handleClientSelect}
+                            defaultValue=""
+                          >
+                            <option value="" disabled>快速載入舊客戶...</option>
+                            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                      <div className="flex items-center"><span className="w-20 text-gray-500">客戶名稱：</span>{isPrintMode ? <span className="flex-1 font-medium text-gray-900">{formData.clientName}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent font-medium text-gray-900" value={formData.clientName} onChange={e => setFormData({...formData, clientName: e.target.value})} />}</div>
+                      <div className="flex items-center"><span className="w-20 text-gray-500">統一編號：</span>{isPrintMode ? <span className="flex-1 text-gray-900">{formData.clientTaxId}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent" value={formData.clientTaxId} onChange={e => setFormData({...formData, clientTaxId: e.target.value})} />}</div>
+                      <div className="flex items-center"><span className="w-20 text-gray-500">聯絡人：</span>{isPrintMode ? <span className="flex-1 text-gray-900">{formData.clientContact}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent" value={formData.clientContact} onChange={e => setFormData({...formData, clientContact: e.target.value})} />}</div>
+                      <div className="flex items-center"><span className="w-20 text-gray-500">電話：</span>{isPrintMode ? <span className="flex-1 text-gray-900">{formData.clientPhone}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent" value={formData.clientPhone} onChange={e => setFormData({...formData, clientPhone: e.target.value})} />}</div>
+                      <div className="flex items-center col-span-2"><span className="w-20 text-gray-500">地址：</span>{isPrintMode ? <span className="flex-1 text-gray-900">{formData.clientAddress}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent" value={formData.clientAddress} onChange={e => setFormData({...formData, clientAddress: e.target.value})} />}</div>
+                    </div>
+                  </section>
                 </div>
-                <div className="contents">
-                  <span className="text-gray-500 font-medium">報價日期：</span>
-                  {isPrintMode ? (
-                    <span className="col-span-2 text-right text-gray-800">{formData.date}</span>
-                  ) : (
-                    <input 
-                      type="date"
-                      className="col-span-2 text-right border-none p-0 bg-transparent focus:ring-0 text-gray-800"
-                      value={formData.date}
-                      onChange={e => setFormData({...formData, date: e.target.value})}
-                    />
-                  )}
-                </div>
-                <div className="contents">
-                  <span className="text-gray-500 font-medium">有效期限：</span>
-                  {isPrintMode ? (
-                    <span className="col-span-2 text-right text-gray-800">{formData.validUntil}</span>
-                  ) : (
-                    <input 
-                      type="date"
-                      className="col-span-2 text-right border-none p-0 bg-transparent focus:ring-0 text-gray-800"
-                      value={formData.validUntil}
-                      onChange={e => setFormData({...formData, validUntil: e.target.value})}
-                    />
-                  )}
-                </div>
-              </div>
-              <div className="bg-teal-50 p-3 rounded border border-teal-100">
-                <label className="block text-xs font-bold text-teal-800 mb-1">專案名稱 Project Name</label>
-                {isPrintMode ? (
-                  <div className="text-sm font-medium text-teal-900">{formData.projectName}</div>
-                ) : (
-                  <input 
-                    className="w-full bg-white border border-teal-200 rounded px-2 py-1 text-sm focus:border-teal-500 focus:ring-teal-500"
-                    placeholder="請輸入專案名稱..."
-                    value={formData.projectName}
-                    onChange={e => setFormData({...formData, projectName: e.target.value})}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </header>
+              </td>
+            </tr>
+          </thead>
 
-        {/* Client Info */}
-        <section className="mb-8">
-          <div className="flex justify-between items-end mb-2 border-b border-gray-200 pb-1">
-             <h3 className="font-bold text-gray-700">客戶資料 Customer</h3>
-             {!isPrintMode && (
-                <select 
-                  className="text-xs border-gray-300 rounded py-1 pl-2 pr-8 shadow-sm focus:border-teal-500 focus:ring-teal-500"
-                  onChange={handleClientSelect}
-                  defaultValue=""
-                >
-                  <option value="" disabled>快速載入舊客戶...</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-             )}
-          </div>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-            <div className="flex items-center">
-              <span className="w-20 text-gray-500">客戶名稱：</span>
-              {isPrintMode ? (
-                <span className="flex-1 font-medium text-gray-900">{formData.clientName}</span>
-              ) : (
-                <input 
-                  className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent font-medium text-gray-900"
-                  value={formData.clientName}
-                  placeholder="公司名稱"
-                  onChange={e => setFormData({...formData, clientName: e.target.value})}
-                />
-              )}
-            </div>
-            <div className="flex items-center">
-              <span className="w-20 text-gray-500">統一編號：</span>
-              {isPrintMode ? (
-                <span className="flex-1 text-gray-900">{formData.clientTaxId}</span>
-              ) : (
-                <input 
-                  className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
-                  value={formData.clientTaxId}
-                  placeholder="8碼統編"
-                  onChange={e => setFormData({...formData, clientTaxId: e.target.value})}
-                />
-              )}
-            </div>
-            <div className="flex items-center">
-              <span className="w-20 text-gray-500">聯絡人：</span>
-              {isPrintMode ? (
-                <span className="flex-1 text-gray-900">{formData.clientContact}</span>
-              ) : (
-                <input 
-                  className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
-                  value={formData.clientContact}
-                  onChange={e => setFormData({...formData, clientContact: e.target.value})}
-                />
-              )}
-            </div>
-            <div className="flex items-center">
-              <span className="w-20 text-gray-500">電話：</span>
-              {isPrintMode ? (
-                <span className="flex-1 text-gray-900">{formData.clientPhone}</span>
-              ) : (
-                <input 
-                  className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
-                  value={formData.clientPhone}
-                  onChange={e => setFormData({...formData, clientPhone: e.target.value})}
-                />
-              )}
-            </div>
-            <div className="flex items-center col-span-2">
-              <span className="w-20 text-gray-500">地址：</span>
-              {isPrintMode ? (
-                <span className="flex-1 text-gray-900">{formData.clientAddress}</span>
-              ) : (
-                <input 
-                  className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
-                  value={formData.clientAddress}
-                  onChange={e => setFormData({...formData, clientAddress: e.target.value})}
-                />
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* Items Table */}
-        <section className="mb-8 min-h-[300px]">
-          <table className="min-w-full divide-y divide-gray-300 border-t border-b border-gray-300">
-            <thead className="bg-teal-50">
-              <tr>
-                <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 w-10">No.</th>
-                <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 w-1/4">項目名稱</th>
-                <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 w-1/4">規格描述 / 備註</th>
-                <th className="px-2 py-2 text-center text-xs font-bold text-teal-800 w-16">頻率</th>
-                <th className="px-2 py-2 text-center text-xs font-bold text-teal-800 w-14">單位</th>
-                <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-20">數量</th>
-                <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-24">單價</th>
-                <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-24">複價(NT$)</th>
-                {!isPrintMode && <th className="px-2 py-2 w-8"></th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {formData.items.map((item, idx) => (
-                <tr key={item.id} className="group">
-                  <td className="px-2 py-2 text-xs text-gray-500 align-top pt-3">{idx + 1}</td>
-                  <td className="px-2 py-2 align-top">
-                    {isPrintMode ? (
-                      <div className="w-full text-sm font-bold text-gray-900 whitespace-pre-wrap">{item.name}</div>
-                    ) : (
-                      <textarea 
-                        className="w-full border-0 p-1 text-sm font-bold text-gray-900 focus:ring-0 resize-none bg-transparent"
-                        rows={1}
-                        value={item.name}
-                        placeholder="輸入項目"
-                        onChange={e => handleItemChange(item.id, 'name', e.target.value)}
-                      />
-                    )}
-                  </td>
-                  <td className="px-2 py-2 align-top">
-                    {isPrintMode ? (
-                      <div className="w-full text-xs text-gray-600 whitespace-pre-wrap">{item.spec}</div>
-                    ) : (
-                      <textarea 
-                        className="w-full border-0 p-1 text-xs text-gray-600 focus:ring-0 resize-none bg-transparent placeholder-gray-300"
-                        rows={2}
-                        value={item.spec}
-                        placeholder="規格描述..."
-                        onChange={e => handleItemChange(item.id, 'spec', e.target.value)}
-                      />
-                    )}
-                  </td>
-                  <td className="px-2 py-2 align-top">
-                     {isPrintMode ? (
-                        <div className="w-full text-center text-xs text-gray-900">{item.frequency}</div>
-                     ) : (
-                       <input 
-                        className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent"
-                        value={item.frequency}
-                        placeholder="-"
-                        onChange={e => handleItemChange(item.id, 'frequency', e.target.value)}
-                      />
-                     )}
-                  </td>
-                  <td className="px-2 py-2 align-top">
-                    {isPrintMode ? (
-                      <div className="w-full text-center text-xs text-gray-900">{item.unit}</div>
-                    ) : (
-                      <input 
-                        className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent"
-                        value={item.unit}
-                        onChange={e => handleItemChange(item.id, 'unit', e.target.value)}
-                      />
-                    )}
-                  </td>
-                  <td className="px-2 py-2 align-top">
-                    {isPrintMode ? (
-                      <div className="w-full text-right text-sm text-gray-900">{item.qty}</div>
-                    ) : (
-                      <input 
-                        type="number"
-                        className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500"
-                        value={item.qty}
-                        onChange={e => handleItemChange(item.id, 'qty', Number(e.target.value))}
-                      />
-                    )}
-                  </td>
-                  <td className="px-2 py-2 align-top">
-                    {isPrintMode ? (
-                      <div className="w-full text-right text-sm text-gray-900">{item.price}</div>
-                    ) : (
-                      <input 
-                        type="number"
-                        className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500"
-                        value={item.price}
-                        onChange={e => handleItemChange(item.id, 'price', Number(e.target.value))}
-                      />
-                    )}
-                  </td>
-                  <td className="px-2 py-2 text-right text-sm font-medium text-gray-900 align-top pt-3">
-                    {(item.price * item.qty).toLocaleString()}
-                  </td>
+          {/* TBODY: 報價內容 */}
+          <tbody>
+            <tr>
+              <td>
+                <section className="mb-8 min-h-[300px]">
+                  <table className="min-w-full divide-y divide-gray-300 border-t border-b border-gray-300">
+                    <thead className="bg-teal-50">
+                      <tr>
+                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 w-10">No.</th>
+                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 w-1/4">項目名稱</th>
+                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 w-1/4">規格描述 / 備註</th>
+                        <th className="px-2 py-2 text-center text-xs font-bold text-teal-800 w-16">頻率</th>
+                        <th className="px-2 py-2 text-center text-xs font-bold text-teal-800 w-14">單位</th>
+                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-20">數量</th>
+                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-24">單價</th>
+                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-24">複價(NT$)</th>
+                        {!isPrintMode && <th className="px-2 py-2 w-8"></th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {formData.items.map((item, idx) => (
+                        <tr key={item.id} className="group page-break-inside-avoid">
+                          <td className="px-2 py-2 text-xs text-gray-500 align-top pt-3">{idx + 1}</td>
+                          <td className="px-2 py-2 align-top">
+                            {isPrintMode ? (
+                              <div className="w-full text-sm font-bold text-gray-900 whitespace-pre-wrap">{item.name}</div>
+                            ) : (
+                              <textarea className="w-full border-0 p-1 text-sm font-bold text-gray-900 focus:ring-0 resize-none bg-transparent" rows={1} value={item.name} onChange={e => handleItemChange(item.id, 'name', e.target.value)} />
+                            )}
+                          </td>
+                          <td className="px-2 py-2 align-top">
+                            {isPrintMode ? (
+                              <div className="w-full text-xs text-gray-600 whitespace-pre-wrap">{item.spec}</div>
+                            ) : (
+                              <textarea className="w-full border-0 p-1 text-xs text-gray-600 focus:ring-0 resize-none bg-transparent placeholder-gray-300" rows={2} value={item.spec} onChange={e => handleItemChange(item.id, 'spec', e.target.value)} />
+                            )}
+                          </td>
+                          <td className="px-2 py-2 align-top">
+                            {isPrintMode ? <div className="w-full text-center text-xs text-gray-900">{item.frequency}</div> : <input className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent" value={item.frequency} onChange={e => handleItemChange(item.id, 'frequency', e.target.value)} />}
+                          </td>
+                          <td className="px-2 py-2 align-top">
+                            {isPrintMode ? <div className="w-full text-center text-xs text-gray-900">{item.unit}</div> : <input className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent" value={item.unit} onChange={e => handleItemChange(item.id, 'unit', e.target.value)} />}
+                          </td>
+                          <td className="px-2 py-2 align-top">
+                            {isPrintMode ? <div className="w-full text-right text-sm text-gray-900">{item.qty}</div> : <input type="number" className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500" value={item.qty} onChange={e => handleItemChange(item.id, 'qty', Number(e.target.value))} />}
+                          </td>
+                          <td className="px-2 py-2 align-top">
+                            {isPrintMode ? <div className="w-full text-right text-sm text-gray-900">{item.price}</div> : <input type="number" className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500" value={item.price} onChange={e => handleItemChange(item.id, 'price', Number(e.target.value))} />}
+                          </td>
+                          <td className="px-2 py-2 text-right text-sm font-medium text-gray-900 align-top pt-3">
+                            {(item.price * item.qty).toLocaleString()}
+                          </td>
+                          {!isPrintMode && (
+                            <td className="px-2 py-2 text-center align-top pt-2">
+                              <button onClick={() => setFormData(p => ({ ...p, items: p.items.filter(i => i.id !== item.id) }))} className="text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  
                   {!isPrintMode && (
-                    <td className="px-2 py-2 text-center align-top pt-2">
-                      <button onClick={() => setFormData(p => ({ ...p, items: p.items.filter(i => i.id !== item.id) }))} className="text-gray-300 hover:text-red-500">
-                        <Trash2 className="w-4 h-4" />
+                    <div className="mt-4 flex gap-2 items-center">
+                      <button onClick={() => addItem()} className="flex items-center text-sm text-teal-600 hover:text-teal-800 font-medium px-3 py-1 border border-teal-200 rounded hover:bg-teal-50">
+                        <Plus className="w-4 h-4 mr-1" /> 手動新增項目
                       </button>
-                    </td>
+                      <div className="h-6 w-px bg-gray-300 mx-2"></div>
+                      <div className="relative">
+                        <select onChange={handleProductSelect} className="pl-8 pr-4 py-1 text-sm border-gray-300 rounded shadow-sm focus:ring-teal-500 focus:border-teal-500 cursor-pointer hover:bg-gray-50" defaultValue="">
+                          <option value="" disabled>從產品/服務庫匯入...</option>
+                          {products.map(p => (
+                            <option key={p.id} value={p.id}>+ {p.name} (NT${p.price})</option>
+                          ))}
+                        </select>
+                        <div className="absolute left-2 top-1.5 pointer-events-none text-gray-500"><ListPlus className="w-4 h-4" /></div>
+                      </div>
+                    </div>
                   )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          {!isPrintMode && (
-            <div className="mt-4 flex gap-2 items-center">
-              <button onClick={() => addItem()} className="flex items-center text-sm text-teal-600 hover:text-teal-800 font-medium px-3 py-1 border border-teal-200 rounded hover:bg-teal-50">
-                <Plus className="w-4 h-4 mr-1" /> 手動新增項目
-              </button>
-              
-              <div className="h-6 w-px bg-gray-300 mx-2"></div>
-              
-              {/* Product Library Dropdown */}
-              <div className="relative">
-                <select 
-                  onChange={handleProductSelect} 
-                  className="pl-8 pr-4 py-1 text-sm border-gray-300 rounded shadow-sm focus:ring-teal-500 focus:border-teal-500 cursor-pointer hover:bg-gray-50"
-                  defaultValue=""
-                >
-                  <option value="" disabled>從產品/服務庫匯入...</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>
-                      + {p.name} (NT${p.price})
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute left-2 top-1.5 pointer-events-none text-gray-500">
-                  <ListPlus className="w-4 h-4" />
+                </section>
+              </td>
+            </tr>
+          </tbody>
+
+          {/* TFOOT: 頁尾合計與簽名 (只會出現在最後) */}
+          <tfoot>
+            <tr>
+              <td>
+                <div className="pt-4 page-break-inside-avoid">
+                  <div className="flex flex-col md:flex-row gap-8 break-inside-avoid">
+                    <div className="flex-1 space-y-4">
+                      <SmartSelect label="付款方式 Payment Method" options={PAYMENT_METHODS} value={formData.paymentMethod} onChange={(val) => setFormData({...formData, paymentMethod: val})} isPrintMode={isPrintMode} />
+                      <SmartSelect label="付款期限 Payment Terms" options={PAYMENT_TERMS} value={formData.paymentTerms} onChange={(val) => setFormData({...formData, paymentTerms: val})} isPrintMode={isPrintMode} />
+                      <NoteSelector value={formData.notes} onChange={(val) => setFormData({...formData, notes: val})} isPrintMode={isPrintMode} />
+                    </div>
+                    <div className="w-full md:w-80">
+                      <div className="bg-gray-50 p-6 rounded-lg space-y-3 border border-gray-200">
+                        <div className="flex justify-between text-sm text-gray-600"><span>合計 (Subtotal)</span><span className="font-mono">NT$ {subtotal.toLocaleString()}</span></div>
+                        <div className="flex justify-between text-sm text-gray-600"><span>營業稅 (Tax 5%)</span><span className="font-mono">NT$ {tax.toLocaleString()}</span></div>
+                        <div className="border-t border-gray-300 my-2"></div>
+                        <div className="flex justify-between items-baseline"><span className="text-base font-bold text-gray-800">總計 (Total)</span><span className="text-xl font-bold text-teal-700 font-mono">NT$ {grandTotal.toLocaleString()}</span></div>
+                        <div className="text-right text-xs text-gray-400 mt-1">幣別：新台幣 (TWD)</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`mt-24 flex justify-between gap-16 ${!isPrintMode ? 'opacity-50 hover:opacity-100 transition-opacity' : ''}`}>
+                      <div className="flex-1 text-center relative group">
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-32 h-32 z-10 pointer-events-none">
+                          <img src={stampPreview} alt="Company Stamp" className="w-full h-full object-contain opacity-80" onError={(e) => { e.target.style.display='none'; }} />
+                        </div>
+                        {!isPrintMode && (
+                          <label className="absolute inset-0 cursor-pointer z-20" title="點擊上傳其他印章">
+                            <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setStampPreview)} className="hidden" />
+                          </label>
+                        )}
+                        <div className="border-b border-gray-800 pb-2 mb-2"></div>
+                        <p className="text-sm font-bold text-gray-600">傑太環境工程顧問有限公司 (簽章)</p>
+                      </div>
+                      <div className="flex-1 text-center">
+                        <div className="border-b border-gray-800 pb-2 mb-2 mt-[60px]"></div>
+                        <p className="text-sm font-bold text-gray-600">客戶確認簽回 (簽章)</p>
+                      </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* Footer: Notes & Totals */}
-        <div className="flex flex-col md:flex-row gap-8 break-inside-avoid">
-          {/* Smart Terms Section */}
-          <div className="flex-1 space-y-4">
-            <SmartSelect 
-              label="付款方式 Payment Method" 
-              options={PAYMENT_METHODS}
-              value={formData.paymentMethod}
-              onChange={(val) => setFormData({...formData, paymentMethod: val})}
-              isPrintMode={isPrintMode}
-            />
-            
-            <SmartSelect 
-              label="付款期限 Payment Terms" 
-              options={PAYMENT_TERMS}
-              value={formData.paymentTerms}
-              onChange={(val) => setFormData({...formData, paymentTerms: val})}
-              isPrintMode={isPrintMode}
-            />
-
-            <NoteSelector 
-              value={formData.notes} 
-              onChange={(val) => setFormData({...formData, notes: val})} 
-              isPrintMode={isPrintMode}
-            />
-          </div>
-
-          {/* Calculations */}
-          <div className="w-full md:w-80">
-            <div className="bg-gray-50 p-6 rounded-lg space-y-3 border border-gray-200">
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>合計 (Subtotal)</span>
-                <span className="font-mono">NT$ {subtotal.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>營業稅 (Tax 5%)</span>
-                <span className="font-mono">NT$ {tax.toLocaleString()}</span>
-              </div>
-              <div className="border-t border-gray-300 my-2"></div>
-              <div className="flex justify-between items-baseline">
-                <span className="text-base font-bold text-gray-800">總計 (Total)</span>
-                <span className="text-xl font-bold text-teal-700 font-mono">NT$ {grandTotal.toLocaleString()}</span>
-              </div>
-              <div className="text-right text-xs text-gray-400 mt-1">幣別：新台幣 (TWD)</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Signature Area (Always visible now, but clear it's for print) */}
-        <div className={`mt-24 flex justify-between gap-16 ${!isPrintMode ? 'opacity-50 hover:opacity-100 transition-opacity' : ''}`}>
-            <div className="flex-1 text-center relative group">
-              {/* Digital Stamp Uploader - 預設顯示 public 資料夾的圖 */}
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-32 h-32 z-10 pointer-events-none">
-                <img 
-                  src={stampPreview} 
-                  alt="Company Stamp" 
-                  className="w-full h-full object-contain opacity-80" 
-                  onError={(e) => { e.target.style.display='none'; }}
-                />
-              </div>
-              
-              {!isPrintMode && (
-                <label className="absolute inset-0 cursor-pointer z-20" title="點擊上傳其他印章 (僅限本次)">
-                  <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setStampPreview)} className="hidden" />
-                </label>
-              )}
-
-              <div className="border-b border-gray-800 pb-2 mb-2"></div>
-              <p className="text-sm font-bold text-gray-600">傑太環境工程顧問有限公司 (簽章)</p>
-            </div>
-            <div className="flex-1 text-center">
-               <div className="border-b border-gray-800 pb-2 mb-2 mt-[60px]"></div> {/* Spacing for alignment */}
-               <p className="text-sm font-bold text-gray-600">客戶確認簽回 (簽章)</p>
-            </div>
-        </div>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
 
       <style>{`
         .btn-primary { @apply flex items-center px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 shadow-sm transition-colors; }
         .btn-secondary { @apply flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors border border-gray-300; }
         @media print {
-          @page { margin: 0; size: A4 portrait; }
+          @page { margin: 10mm; size: A4 portrait; }
           body { -webkit-print-color-adjust: exact; padding: 0; background: white; width: 100%; height: 100%; }
           .no-print { display: none !important; }
-          /* 確保內容不被切掉 */
-          .print-content { padding: 40px; }
+          .print-container { padding: 0; margin: 0; width: 100%; }
+          .page-break-inside-avoid { page-break-inside: avoid; }
+          /* 讓 thead 每頁重複 */
+          thead { display: table-header-group; }
+          tfoot { display: table-footer-group; }
         }
       `}</style>
     </div>
