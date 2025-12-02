@@ -99,8 +99,8 @@ const Spinner = () => (
   </div>
 );
 
-// --- Custom Input Components ---
-const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸入..." }) => {
+// --- Custom Input Components (V5.7: 支援列印模式純文字化) ---
+const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸入...", isPrintMode }) => {
   const isCustom = !options.includes(value) && value !== '';
   const [mode, setMode] = useState(isCustom ? 'custom' : 'select');
   
@@ -111,6 +111,16 @@ const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸
       setMode('select');
     }
   }, [value, options]);
+
+  // 列印模式：只顯示純文字，沒有標籤和下拉選單
+  if (isPrintMode) {
+    return (
+      <div className="w-full mb-2">
+        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{label}</div>
+        <div className="text-sm text-gray-900 font-medium pl-1">{value || '-'}</div>
+      </div>
+    );
+  }
 
   const handleSelectChange = (e) => {
     const val = e.target.value;
@@ -156,7 +166,7 @@ const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸
   );
 };
 
-const NoteSelector = ({ value, onChange }) => {
+const NoteSelector = ({ value, onChange, isPrintMode }) => {
   const handleTemplateChange = (e) => {
     const idx = e.target.value;
     if (idx === 'custom') return;
@@ -164,6 +174,16 @@ const NoteSelector = ({ value, onChange }) => {
       onChange(NOTE_TEMPLATES[idx].content);
     }
   };
+
+  // 列印模式：只顯示純文字，支援換行
+  if (isPrintMode) {
+    return (
+      <div className="w-full mt-4">
+        <div className="text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">備註 Notes</div>
+        <div className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed pl-1 border-l-2 border-gray-100">{value}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -273,7 +293,7 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
   const [quotes, setQuotes] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('quotes'); // 'quotes' (進行中), 'orders' (已成交)
+  const [activeTab, setActiveTab] = useState('quotes');
 
   useEffect(() => {
     document.title = "傑太環境工程報價系統";
@@ -294,7 +314,6 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
     }
   };
 
-  // 1. 先做搜尋篩選
   const filteredQuotes = useMemo(() => {
     let result = quotes;
     if (searchTerm) {
@@ -308,14 +327,11 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
     return result;
   }, [quotes, searchTerm]);
 
-  // 2. 再做分頁篩選 (核心邏輯)
   const tabFilteredQuotes = useMemo(() => {
     return filteredQuotes.filter(q => {
       if (activeTab === 'quotes') {
-        // 進行中：草稿、已發送、已確認、已取消 (除非你想把取消也分出去)
         return ['draft', 'sent', 'confirmed', 'cancelled'].includes(q.status) || !q.status;
       } else {
-        // 已成交：已轉訂單
         return q.status === 'ordered';
       }
     });
@@ -333,7 +349,6 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
 
   return (
     <div className="space-y-6 w-full">
-      {/* 上方標題與按鈕區 */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-800 border-l-4 border-teal-600 pl-3">專案報價管理</h2>
         
@@ -357,7 +372,6 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
         </div>
       </div>
 
-      {/* 分頁籤 (Tabs) */}
       <div className="flex border-b border-gray-200">
         <button
           onClick={() => setActiveTab('quotes')}
@@ -383,7 +397,6 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
         </button>
       </div>
 
-      {/* 列表區塊 */}
       <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200 w-full mt-0 rounded-tl-none">
         <div className="overflow-x-auto w-full">
           <table className="min-w-full divide-y divide-gray-200 w-full">
@@ -687,7 +700,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                 src={logoPreview} 
                 alt="Company Logo" 
                 className="h-24 w-auto object-contain"
-                onError={(e) => { e.target.style.display='none'; }} 
+                onError={(e) => { e.target.style.display='none'; }}
               />
               
               {!isPrintMode && (
@@ -712,35 +725,57 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           <div className="w-1/3 text-right">
             <div className="inline-block text-left w-full">
               <div className="grid grid-cols-3 gap-y-2 text-sm items-center mb-4">
-                <span className="text-gray-500 font-medium">報價單號：</span>
-                <input 
-                  className="col-span-2 text-right font-bold text-teal-700 border-none p-0 bg-transparent focus:ring-0"
-                  value={formData.quoteNumber}
-                  onChange={e => setFormData({...formData, quoteNumber: e.target.value})}
-                />
-                <span className="text-gray-500 font-medium">報價日期：</span>
-                <input 
-                  type="date"
-                  className="col-span-2 text-right border-none p-0 bg-transparent focus:ring-0 text-gray-800"
-                  value={formData.date}
-                  onChange={e => setFormData({...formData, date: e.target.value})}
-                />
-                <span className="text-gray-500 font-medium">有效期限：</span>
-                <input 
-                  type="date"
-                  className="col-span-2 text-right border-none p-0 bg-transparent focus:ring-0 text-gray-800"
-                  value={formData.validUntil}
-                  onChange={e => setFormData({...formData, validUntil: e.target.value})}
-                />
+                <div className="contents">
+                  <span className="text-gray-500 font-medium">報價單號：</span>
+                  {isPrintMode ? (
+                    <span className="col-span-2 text-right font-bold text-teal-700">{formData.quoteNumber}</span>
+                  ) : (
+                    <input 
+                      className="col-span-2 text-right font-bold text-teal-700 border-none p-0 bg-transparent focus:ring-0"
+                      value={formData.quoteNumber}
+                      onChange={e => setFormData({...formData, quoteNumber: e.target.value})}
+                    />
+                  )}
+                </div>
+                <div className="contents">
+                  <span className="text-gray-500 font-medium">報價日期：</span>
+                  {isPrintMode ? (
+                    <span className="col-span-2 text-right text-gray-800">{formData.date}</span>
+                  ) : (
+                    <input 
+                      type="date"
+                      className="col-span-2 text-right border-none p-0 bg-transparent focus:ring-0 text-gray-800"
+                      value={formData.date}
+                      onChange={e => setFormData({...formData, date: e.target.value})}
+                    />
+                  )}
+                </div>
+                <div className="contents">
+                  <span className="text-gray-500 font-medium">有效期限：</span>
+                  {isPrintMode ? (
+                    <span className="col-span-2 text-right text-gray-800">{formData.validUntil}</span>
+                  ) : (
+                    <input 
+                      type="date"
+                      className="col-span-2 text-right border-none p-0 bg-transparent focus:ring-0 text-gray-800"
+                      value={formData.validUntil}
+                      onChange={e => setFormData({...formData, validUntil: e.target.value})}
+                    />
+                  )}
+                </div>
               </div>
               <div className="bg-teal-50 p-3 rounded border border-teal-100">
                 <label className="block text-xs font-bold text-teal-800 mb-1">專案名稱 Project Name</label>
-                <input 
-                  className="w-full bg-white border border-teal-200 rounded px-2 py-1 text-sm focus:border-teal-500 focus:ring-teal-500"
-                  placeholder="請輸入專案名稱..."
-                  value={formData.projectName}
-                  onChange={e => setFormData({...formData, projectName: e.target.value})}
-                />
+                {isPrintMode ? (
+                  <div className="text-sm font-medium text-teal-900">{formData.projectName}</div>
+                ) : (
+                  <input 
+                    className="w-full bg-white border border-teal-200 rounded px-2 py-1 text-sm focus:border-teal-500 focus:ring-teal-500"
+                    placeholder="請輸入專案名稱..."
+                    value={formData.projectName}
+                    onChange={e => setFormData({...formData, projectName: e.target.value})}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -764,45 +799,65 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
             <div className="flex items-center">
               <span className="w-20 text-gray-500">客戶名稱：</span>
-              <input 
-                className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent font-medium text-gray-900"
-                value={formData.clientName}
-                placeholder="公司名稱"
-                onChange={e => setFormData({...formData, clientName: e.target.value})}
-              />
+              {isPrintMode ? (
+                <span className="flex-1 font-medium text-gray-900">{formData.clientName}</span>
+              ) : (
+                <input 
+                  className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent font-medium text-gray-900"
+                  value={formData.clientName}
+                  placeholder="公司名稱"
+                  onChange={e => setFormData({...formData, clientName: e.target.value})}
+                />
+              )}
             </div>
             <div className="flex items-center">
               <span className="w-20 text-gray-500">統一編號：</span>
-              <input 
-                className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
-                value={formData.clientTaxId}
-                placeholder="8碼統編"
-                onChange={e => setFormData({...formData, clientTaxId: e.target.value})}
-              />
+              {isPrintMode ? (
+                <span className="flex-1 text-gray-900">{formData.clientTaxId}</span>
+              ) : (
+                <input 
+                  className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
+                  value={formData.clientTaxId}
+                  placeholder="8碼統編"
+                  onChange={e => setFormData({...formData, clientTaxId: e.target.value})}
+                />
+              )}
             </div>
             <div className="flex items-center">
               <span className="w-20 text-gray-500">聯絡人：</span>
-              <input 
-                className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
-                value={formData.clientContact}
-                onChange={e => setFormData({...formData, clientContact: e.target.value})}
-              />
+              {isPrintMode ? (
+                <span className="flex-1 text-gray-900">{formData.clientContact}</span>
+              ) : (
+                <input 
+                  className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
+                  value={formData.clientContact}
+                  onChange={e => setFormData({...formData, clientContact: e.target.value})}
+                />
+              )}
             </div>
             <div className="flex items-center">
               <span className="w-20 text-gray-500">電話：</span>
-              <input 
-                className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
-                value={formData.clientPhone}
-                onChange={e => setFormData({...formData, clientPhone: e.target.value})}
-              />
+              {isPrintMode ? (
+                <span className="flex-1 text-gray-900">{formData.clientPhone}</span>
+              ) : (
+                <input 
+                  className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
+                  value={formData.clientPhone}
+                  onChange={e => setFormData({...formData, clientPhone: e.target.value})}
+                />
+              )}
             </div>
             <div className="flex items-center col-span-2">
               <span className="w-20 text-gray-500">地址：</span>
-              <input 
-                className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
-                value={formData.clientAddress}
-                onChange={e => setFormData({...formData, clientAddress: e.target.value})}
-              />
+              {isPrintMode ? (
+                <span className="flex-1 text-gray-900">{formData.clientAddress}</span>
+              ) : (
+                <input 
+                  className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent"
+                  value={formData.clientAddress}
+                  onChange={e => setFormData({...formData, clientAddress: e.target.value})}
+                />
+              )}
             </div>
           </div>
         </section>
@@ -828,53 +883,77 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                 <tr key={item.id} className="group">
                   <td className="px-2 py-2 text-xs text-gray-500 align-top pt-3">{idx + 1}</td>
                   <td className="px-2 py-2 align-top">
-                    <textarea 
-                      className="w-full border-0 p-1 text-sm font-bold text-gray-900 focus:ring-0 resize-none bg-transparent"
-                      rows={1}
-                      value={item.name}
-                      placeholder="輸入項目"
-                      onChange={e => handleItemChange(item.id, 'name', e.target.value)}
-                    />
+                    {isPrintMode ? (
+                      <div className="w-full text-sm font-bold text-gray-900 whitespace-pre-wrap">{item.name}</div>
+                    ) : (
+                      <textarea 
+                        className="w-full border-0 p-1 text-sm font-bold text-gray-900 focus:ring-0 resize-none bg-transparent"
+                        rows={1}
+                        value={item.name}
+                        placeholder="輸入項目"
+                        onChange={e => handleItemChange(item.id, 'name', e.target.value)}
+                      />
+                    )}
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <textarea 
-                      className="w-full border-0 p-1 text-xs text-gray-600 focus:ring-0 resize-none bg-transparent placeholder-gray-300"
-                      rows={2}
-                      value={item.spec}
-                      placeholder="規格描述..."
-                      onChange={e => handleItemChange(item.id, 'spec', e.target.value)}
-                    />
+                    {isPrintMode ? (
+                      <div className="w-full text-xs text-gray-600 whitespace-pre-wrap">{item.spec}</div>
+                    ) : (
+                      <textarea 
+                        className="w-full border-0 p-1 text-xs text-gray-600 focus:ring-0 resize-none bg-transparent placeholder-gray-300"
+                        rows={2}
+                        value={item.spec}
+                        placeholder="規格描述..."
+                        onChange={e => handleItemChange(item.id, 'spec', e.target.value)}
+                      />
+                    )}
                   </td>
                   <td className="px-2 py-2 align-top">
-                     <input 
-                      className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent"
-                      value={item.frequency}
-                      placeholder="-"
-                      onChange={e => handleItemChange(item.id, 'frequency', e.target.value)}
-                    />
+                     {isPrintMode ? (
+                        <div className="w-full text-center text-xs text-gray-900">{item.frequency}</div>
+                     ) : (
+                       <input 
+                        className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent"
+                        value={item.frequency}
+                        placeholder="-"
+                        onChange={e => handleItemChange(item.id, 'frequency', e.target.value)}
+                      />
+                     )}
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <input 
-                      className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent"
-                      value={item.unit}
-                      onChange={e => handleItemChange(item.id, 'unit', e.target.value)}
-                    />
+                    {isPrintMode ? (
+                      <div className="w-full text-center text-xs text-gray-900">{item.unit}</div>
+                    ) : (
+                      <input 
+                        className="w-full text-center border-0 p-1 text-xs text-gray-900 focus:ring-0 bg-transparent"
+                        value={item.unit}
+                        onChange={e => handleItemChange(item.id, 'unit', e.target.value)}
+                      />
+                    )}
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <input 
-                      type="number"
-                      className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500"
-                      value={item.qty}
-                      onChange={e => handleItemChange(item.id, 'qty', Number(e.target.value))}
-                    />
+                    {isPrintMode ? (
+                      <div className="w-full text-right text-sm text-gray-900">{item.qty}</div>
+                    ) : (
+                      <input 
+                        type="number"
+                        className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500"
+                        value={item.qty}
+                        onChange={e => handleItemChange(item.id, 'qty', Number(e.target.value))}
+                      />
+                    )}
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <input 
-                      type="number"
-                      className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500"
-                      value={item.price}
-                      onChange={e => handleItemChange(item.id, 'price', Number(e.target.value))}
-                    />
+                    {isPrintMode ? (
+                      <div className="w-full text-right text-sm text-gray-900">{item.price}</div>
+                    ) : (
+                      <input 
+                        type="number"
+                        className="w-full text-right border-0 border-b border-transparent group-hover:border-gray-200 p-1 text-sm text-gray-900 focus:ring-0 focus:border-teal-500"
+                        value={item.price}
+                        onChange={e => handleItemChange(item.id, 'price', Number(e.target.value))}
+                      />
+                    )}
                   </td>
                   <td className="px-2 py-2 text-right text-sm font-medium text-gray-900 align-top pt-3">
                     {(item.price * item.qty).toLocaleString()}
@@ -930,6 +1009,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
               options={PAYMENT_METHODS}
               value={formData.paymentMethod}
               onChange={(val) => setFormData({...formData, paymentMethod: val})}
+              isPrintMode={isPrintMode}
             />
             
             <SmartSelect 
@@ -937,11 +1017,13 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
               options={PAYMENT_TERMS}
               value={formData.paymentTerms}
               onChange={(val) => setFormData({...formData, paymentTerms: val})}
+              isPrintMode={isPrintMode}
             />
 
             <NoteSelector 
               value={formData.notes} 
               onChange={(val) => setFormData({...formData, notes: val})} 
+              isPrintMode={isPrintMode}
             />
           </div>
 
@@ -999,9 +1081,11 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         .btn-primary { @apply flex items-center px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 shadow-sm transition-colors; }
         .btn-secondary { @apply flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors border border-gray-300; }
         @media print {
-          @page { margin: 10mm; size: A4 portrait; }
-          body { -webkit-print-color-adjust: exact; padding: 0; background: white; }
+          @page { margin: 0; size: A4 portrait; }
+          body { -webkit-print-color-adjust: exact; padding: 0; background: white; width: 100%; height: 100%; }
           .no-print { display: none !important; }
+          /* 確保內容不被切掉 */
+          .print-content { padding: 40px; }
         }
       `}</style>
     </div>
