@@ -101,7 +101,7 @@ const Spinner = () => (
   </div>
 );
 
-// --- Custom Input Components ---
+// --- Custom Input Components (V6.2: 完美修復列印樣式) ---
 const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸入...", isPrintMode }) => {
   const isCustom = !options.includes(value) && value !== '';
   const [mode, setMode] = useState(isCustom ? 'custom' : 'select');
@@ -114,11 +114,12 @@ const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸
     }
   }, [value, options]);
 
+  // 列印模式：只顯示純文字，完全移除下拉選單元件
   if (isPrintMode) {
     return (
       <div className="w-full mb-2">
         <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{label}</div>
-        <div className="text-sm text-gray-900 font-medium pl-1">{value || '-'}</div>
+        <div className="text-sm text-gray-900 font-medium pl-1 border-b border-transparent">{value || '-'}</div>
       </div>
     );
   }
@@ -176,11 +177,12 @@ const NoteSelector = ({ value, onChange, isPrintMode }) => {
     }
   };
 
+  // 列印模式：純文字，移除輸入框樣式
   if (isPrintMode) {
     return (
       <div className="w-full mt-4">
         <div className="text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">備註 Notes</div>
-        <div className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed pl-1 border-l-2 border-gray-100">{value}</div>
+        <div className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed pl-1">{value}</div>
       </div>
     );
   }
@@ -227,7 +229,7 @@ export default function App() {
   if (!user) return <Spinner />;
 
   return (
-    <div className={`min-h-screen w-full max-w-full bg-gray-50 text-gray-900 font-sans ${printMode ? 'bg-white' : ''}`}>
+    <div className={`min-h-screen w-full max-w-full bg-gray-50 text-gray-900 font-sans ${printMode ? 'bg-white block' : 'flex flex-col'}`}>
       {!printMode && (
         <nav className="bg-teal-800 text-white shadow-lg sticky top-0 z-50 w-full">
           <div className="w-full px-4 sm:px-6 lg:px-8">
@@ -263,7 +265,7 @@ export default function App() {
         </nav>
       )}
 
-      <main className={`w-full max-w-full ${printMode ? 'p-0' : 'py-6 px-4 sm:px-6 lg:px-8'}`}>
+      <main className={`w-full max-w-full ${printMode ? 'p-0 block' : 'py-6 px-4 sm:px-6 lg:px-8'}`}>
         {view === 'dashboard' && (
           <Dashboard 
             user={user} 
@@ -473,7 +475,7 @@ const Dashboard = ({ user, onEdit, onCreate }) => {
   );
 };
 
-// --- Editor (V6.1: 使用 Table 結構 + 強制 CSS Reset) ---
+// --- Editor (V6.2: 完美修復列印樣式) ---
 const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, isPrintMode }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -596,7 +598,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     }
   };
 
-  // 智慧同步功能 (Smart Sync)
+  // V5.9: 智慧同步功能 (Smart Sync) - 客戶
   const syncCustomerData = async (clientName, data) => {
     if (!clientName) return;
     try {
@@ -621,6 +623,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     } catch (e) { console.error("客戶同步失敗", e); }
   };
 
+  // V6.0: 智慧同步功能 (Smart Sync) - 產品
   const syncProductData = async (items) => {
     if (!items || items.length === 0) return;
     try {
@@ -685,7 +688,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
   if (loading) return <Spinner />;
 
   return (
-    <div className={`bg-white ${isPrintMode ? '' : 'shadow-xl rounded-xl border border-gray-200'} flex flex-col min-h-[calc(100vh-6rem)] w-full`}>
+    <div className={`min-h-screen w-full max-w-full bg-gray-50 text-gray-900 font-sans ${printMode ? 'bg-white block' : 'flex flex-col'}`}>
       
       {!isPrintMode && (
         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex flex-wrap gap-3 justify-between items-center sticky top-0 z-20">
@@ -723,7 +726,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         </div>
       )}
 
-      {/* --- Document Content (V6.1: 使用 table 結構以支援跨頁表頭) --- */}
+      {/* --- Document Content (V6.2: Table Layout + CSS Reset + Pure Text Mode) --- */}
       <div className={`flex-1 ${isPrintMode ? 'p-0 w-full max-w-[210mm] mx-auto print-container' : 'p-8 sm:p-12'}`}>
         
         {/* Cancel Print Button */}
@@ -739,11 +742,10 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         )}
 
         <table className="w-full">
-          {/* THEAD: 這是會每頁重複出現的表頭 */}
           <thead>
             <tr>
               <td>
-                <div className="pb-6"> {/* 表頭內容 */}
+                <div className="pb-6"> 
                   <header className="flex justify-between items-start mb-4 border-b-2 border-teal-700 pb-4 relative">
                     <div className="flex gap-6">
                       <div className="relative group">
@@ -829,17 +831,8 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                       </div>
                     </div>
                   </header>
-                </div>
-              </td>
-            </tr>
-          </thead>
 
-          {/* TBODY: 報價內容 + 客戶資料 + 頁尾 */}
-          <tbody>
-            <tr>
-              <td>
-                {/* Client Info */}
-                <section className="mb-2">
+                  <section className="mb-2">
                     <div className="flex justify-between items-end mb-2 border-b border-gray-200 pb-1">
                       <h3 className="font-bold text-gray-700">客戶資料 Customer</h3>
                       {!isPrintMode && (
@@ -861,7 +854,14 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                       <div className="flex items-center col-span-2"><span className="w-20 text-gray-500">地址：</span>{isPrintMode ? <span className="flex-1 text-gray-900">{formData.clientAddress}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent" value={formData.clientAddress} onChange={e => setFormData({...formData, clientAddress: e.target.value})} />}</div>
                     </div>
                   </section>
+                </div>
+              </td>
+            </tr>
+          </thead>
 
+          <tbody>
+            <tr>
+              <td>
                 <section className="mb-8 min-h-[300px]">
                   <table className="min-w-full divide-y divide-gray-300 border-t border-b border-gray-300">
                     <thead className="bg-teal-50">
@@ -939,7 +939,6 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                   )}
                 </section>
               
-                {/* Footer Section: 合計與簽名 (放在 tbody 最後，避免佔用 tfoot 固定位置) */}
                 <div className="pt-4 page-break-inside-avoid">
                   <div className="flex flex-col md:flex-row gap-8 break-inside-avoid">
                     <div className="flex-1 space-y-4">
@@ -980,6 +979,10 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
               </td>
             </tr>
           </tbody>
+
+          <tfoot>
+             <tr><td><div className="h-8"></div></td></tr>
+          </tfoot>
         </table>
       </div>
 
@@ -988,6 +991,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         .btn-secondary { @apply flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors border border-gray-300; }
         @media print {
           @page { margin: 10mm; size: A4 portrait; }
+          
           html, body, #root { 
             height: auto !important; 
             overflow: visible !important; 
@@ -995,18 +999,21 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
             margin: 0; 
             padding: 0; 
           }
-          /* 暴力覆蓋 Tailwind 可能的 height: 100% */
           .min-h-screen { min-height: 0 !important; }
           
           .no-print { display: none !important; }
           .print-container { padding: 0; margin: 0; width: 100%; }
           .page-break-inside-avoid { page-break-inside: avoid; }
           
-          /* 關鍵：表格分頁設定 */
-          table { width: 100%; border-collapse: collapse; }
-          thead { display: table-header-group !important; } /* 每頁重複表頭 */
+          /* 強制隱藏日曆圖示和下拉箭頭 */
+          input[type="date"]::-webkit-calendar-picker-indicator { display: none !important; }
+          input[type="date"]::-webkit-inner-spin-button { display: none !important; }
+          
+          table { width: 100% !important; border-collapse: collapse; display: table !important; }
+          thead { display: table-header-group !important; }
           tbody { display: table-row-group !important; }
-          tfoot { display: table-row-group !important; } /* 簽名欄不強制置底，隨內容結束 */
+          tfoot { display: table-row-group !important; }
+          tr { page-break-inside: avoid; page-break-after: auto; }
         }
       `}</style>
     </div>
@@ -1033,11 +1040,9 @@ const CustomerManager = () => {
     if(!form.name) return;
     
     if (editingId) {
-      // Update Mode
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', editingId), form);
       setEditingId(null);
     } else {
-      // Create Mode
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), form);
     }
     setForm({ name: '', taxId: '', contact: '', phone: '', fax: '', address: '', email: '' });
