@@ -17,7 +17,9 @@ import {
   query, 
   serverTimestamp,
   where,
-  getDocs
+  getDocs,
+  orderBy, // 新增
+  limit    // 新增
 } from 'firebase/firestore';
 import { 
   Plus, Trash2, FileText, Users, Printer, Save, Copy, 
@@ -75,6 +77,47 @@ const generateQuoteNumber = () => {
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const randomSeq = String(Math.floor(Math.random() * 999) + 1).padStart(3, '0');
   return `J-${yy}-${mm}${randomSeq}`;
+};
+
+// 自動取得下一個流水號邏輯
+const getNextQuoteNumber = async (dbInstance, currentAppId) => {
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const prefix = `J-${yy}-${mm}`; // 例如：J-25-12
+
+  try {
+    // 1. 去資料庫找最後一筆報價單 (依照單號倒序排列，只取 1 筆)
+    const q = query(
+      collection(dbInstance, 'artifacts', currentAppId, 'public', 'data', 'quotations'),
+      orderBy('quoteNumber', 'desc'),
+      limit(1)
+    );
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      const lastId = snapshot.docs[0].data().quoteNumber;
+      // 2. 如果最後一筆單號是這個月的 (例如 J-25-12 開頭)
+      if (lastId && lastId.startsWith(prefix)) {
+        // 3. 擷取後三碼並 +1
+        // 考慮到可能有 -V 版本號，先移除版本號再取後三碼
+        const baseId = lastId.split('-V')[0]; 
+        const lastSeq = parseInt(baseId.slice(-3)); 
+        
+        if (!isNaN(lastSeq)) {
+          const nextSeq = String(lastSeq + 1).padStart(3, '0');
+          return `${prefix}${nextSeq}`; // 回傳流水號，例如 J-25-12002
+        }
+      }
+    }
+    // 4. 如果資料庫沒資料，或是這個月的第一筆，就從 001 開始
+    return `${prefix}001`;
+  } catch (error) {
+    console.error("流水號生成失敗，使用亂數代替:", error);
+    // 如果發生錯誤(例如網路問題)，回退到原本的亂數邏輯
+    const randomSeq = String(Math.floor(Math.random() * 999) + 1).padStart(3, '0');
+    return `${prefix}${randomSeq}`;
+  }
 };
 
 const formatDate = (dateObj) => {
@@ -306,6 +349,7 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // 預設按時間排序，方便後續處理
       docs.sort((a, b) => (b.updatedAt?.seconds || b.createdAt?.seconds || 0) - (a.updatedAt?.seconds || a.createdAt?.seconds || 0));
       setQuotes(docs);
       setLoading(false);
@@ -334,7 +378,7 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
     if (confirm(`確定要複製「${quote.projectName || quote.quoteNumber}」嗎？`)) {
       const newQuote = {
         ...quote,
-        quoteNumber: generateQuoteNumber(),
+        quoteNumber: await getNextQuoteNumber(db, appId), // 這裡也改用自動流水號
         projectName: `${quote.projectName || '專案'} (複製)`,
         status: 'draft',
         version: 1,
@@ -357,11 +401,15 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
     }
   };
 
-  // 篩選邏輯
-  const filteredQuotes = useMemo(() => {
+  // ----------------------------------------------------------------
+  // 新邏輯：先篩選 (Filter) -> 再摺疊 (Group/Fold Versions)
+  // ----------------------------------------------------------------
+
+  // 1. 第一階段：過濾資料 (搜尋、狀態、客戶)
+  const filteredRawQuotes = useMemo(() => {
     let result = quotes;
-    
-    // 搜尋篩選
+
+    // 搜尋關鍵字
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
       result = result.filter(q => 
@@ -380,34 +428,62 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
     if (customerFilter !== 'all') {
       result = result.filter(q => q.clientName === customerFilter);
     }
-    
+
     return result;
   }, [quotes, searchTerm, statusFilter, customerFilter]);
 
-  // Tab 篩選
+  // 2. 第二階段：針對「篩選後的結果」進行摺疊 (取該結果中的最新版)
+  const displayedQuotes = useMemo(() => {
+    const groups = {};
+    
+    filteredRawQuotes.forEach(quote => {
+      // 取得底號 (移除 -V數字)
+      // 例如: J-25-12001-V2 -> J-25-12001
+      const baseNumber = quote.quoteNumber ? quote.quoteNumber.replace(/-V\d+$/, '') : 'unknown';
+      
+      // 比較並保留版本號最大的
+      if (!groups[baseNumber]) {
+        groups[baseNumber] = quote;
+      } else {
+        const currentVer = quote.version || 1;
+        const storedVer = groups[baseNumber].version || 1;
+        // 如果目前這張版本比較大，就取代舊的
+        if (currentVer > storedVer) {
+          groups[baseNumber] = quote;
+        }
+      }
+    });
+
+    // 轉回陣列並依照更新時間排序
+    return Object.values(groups).sort((a, b) => 
+      (b.updatedAt?.seconds || b.createdAt?.seconds || 0) - (a.updatedAt?.seconds || a.createdAt?.seconds || 0)
+    );
+  }, [filteredRawQuotes]);
+
+  // 3. Tab 分類 (進行中 vs 已成交) - 來源改為 displayedQuotes
   const tabFilteredQuotes = useMemo(() => {
-    return filteredQuotes.filter(q => {
+    return displayedQuotes.filter(q => {
       if (activeTab === 'quotes') {
         return ['draft', 'sent', 'confirmed', 'cancelled'].includes(q.status) || !q.status;
       } else {
         return q.status === 'ordered';
       }
     });
-  }, [filteredQuotes, activeTab]);
+  }, [displayedQuotes, activeTab]);
 
-  // 計算統計數據
+  // 4. 統計數據 - 來源改為 displayedQuotes (確保金額不重複計算)
   const stats = useMemo(() => {
-    const inProgress = filteredQuotes.filter(q => ['draft', 'sent', 'confirmed', 'cancelled'].includes(q.status) || !q.status);
-    const ordered = filteredQuotes.filter(q => q.status === 'ordered');
+    const inProgress = displayedQuotes.filter(q => ['draft', 'sent', 'confirmed', 'cancelled'].includes(q.status) || !q.status);
+    const ordered = displayedQuotes.filter(q => q.status === 'ordered');
     
     return {
       inProgressCount: inProgress.length,
       inProgressTotal: inProgress.reduce((sum, q) => sum + (q.grandTotal || 0), 0),
       orderedCount: ordered.length,
       orderedTotal: ordered.reduce((sum, q) => sum + (q.grandTotal || 0), 0),
-      allTotal: filteredQuotes.reduce((sum, q) => sum + (q.grandTotal || 0), 0)
+      allTotal: displayedQuotes.reduce((sum, q) => sum + (q.grandTotal || 0), 0)
     };
-  }, [filteredQuotes]);
+  }, [displayedQuotes]);
 
   // 取得唯一客戶列表（用於篩選下拉選單）
   const uniqueClients = useMemo(() => {
@@ -455,7 +531,7 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
               <p className="text-2xl font-bold text-gray-800">{stats.inProgressCount} 件</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-400">總金額</p>
+              <p className="text-xs text-gray-400">總金額 (折疊後)</p>
               <p className="text-lg font-bold text-teal-600">NT$ {stats.inProgressTotal.toLocaleString()}</p>
             </div>
           </div>
@@ -468,7 +544,7 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
               <p className="text-2xl font-bold text-green-800">{stats.orderedCount} 件</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-green-500">總金額</p>
+              <p className="text-xs text-green-500">總金額 (折疊後)</p>
               <p className="text-lg font-bold text-green-700">NT$ {stats.orderedTotal.toLocaleString()}</p>
             </div>
           </div>
@@ -478,10 +554,10 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-teal-600">全部案件</p>
-              <p className="text-2xl font-bold text-teal-800">{filteredQuotes.length} 件</p>
+              <p className="text-2xl font-bold text-teal-800">{displayedQuotes.length} 件</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-teal-500">總金額</p>
+              <p className="text-xs text-teal-500">總金額 (折疊後)</p>
               <p className="text-lg font-bold text-teal-700">NT$ {stats.allTotal.toLocaleString()}</p>
             </div>
           </div>
@@ -549,7 +625,7 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
         {/* 顯示篩選結果數量 */}
         {hasActiveFilters && (
           <div className="mt-3 text-sm text-gray-500">
-            篩選結果：共 <span className="font-bold text-teal-600">{filteredQuotes.length}</span> 筆資料
+            篩選結果：共 <span className="font-bold text-teal-600">{displayedQuotes.length}</span> 筆資料
           </div>
         )}
       </div>
@@ -684,12 +760,13 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
   const [products, setProducts] = useState([]);
 
   const [formData, setFormData] = useState({
-    quoteNumber: generateQuoteNumber(),
+    quoteNumber: generateQuoteNumber(), // 暫時用亂數，useEffect 會覆蓋它
     projectName: '',
     status: 'draft',
     version: 1,
     date: formatDate(new Date()),
     validUntil: formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
+    // 預設公司聯絡資訊
     companyContact: '張惟荏',
     companyPhone: '02-6609-5888 #103',
     clientName: '',
@@ -712,6 +789,18 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     const unsubP = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'products'), s => setProducts(s.docs.map(d=>({id:d.id, ...d.data()}))));
     return () => { unsubC(); unsubP(); };
   }, []);
+
+  // 自動流水號：如果是新增模式(沒有quoteId)，自動去抓下一號
+  useEffect(() => {
+    if (!quoteId) {
+      const fetchSeq = async () => {
+        const nextNum = await getNextQuoteNumber(db, appId);
+        // 更新表單中的單號
+        setFormData(prev => ({ ...prev, quoteNumber: nextNum }));
+      };
+      fetchSeq();
+    }
+  }, [quoteId]);
 
   useEffect(() => {
     if (quoteId) {
@@ -967,7 +1056,8 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                         <div className="mt-4 text-sm text-gray-600 space-y-0.5 leading-relaxed">
                           <p>統一編號：<span className="font-medium">60779653</span></p>
                           <p>地　　址：新北市土城區金城路二段245巷40號1F</p>
-{/* --- 修改開始：將電話改成可編輯 --- */}
+                          
+                          {/* 電話欄位 */}
                           <div className="flex items-center">
                             <span>電　　話：</span>
                             {isPrintMode ? (
@@ -980,9 +1070,8 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                               />
                             )}
                           </div>
-                          {/* --- 修改結束 --- */}
 
-                          {/* --- 修改開始：將聯絡人改成可編輯 --- */}
+                          {/* 聯絡人欄位 */}
                           <div className="flex items-center">
                             <span>聯 絡 人：</span>
                             {isPrintMode ? (
@@ -995,10 +1084,9 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                               />
                             )}
                           </div>
-                          {/* --- 修改結束 --- */}
-                        </div>
                         </div>
                       </div>
+                    </div>
 
                     <div className="w-1/3 text-right">
                       <div className="inline-block text-left w-full">
@@ -1184,7 +1272,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                 <div className="pt-4 page-break-inside-avoid">
                   <div className="flex flex-col md:flex-row gap-8 break-inside-avoid">
                     <div className="flex-1 space-y-4">
-                      <SmartSelect label="付款方式 Payment Method" options={PAYMENT_METHODS} value={formData.paymentMethod} onChange={(val) => setFormData({...formData, paymentMethod: val})} isPrintMode={isPrintMode} />
+                      <SmartSelect label="付款方式 Payment Method" options={PAYMENT_METHODS} value={formData.paymentMethod} onChange={(val) => setFormData({...formData,paymentMethod: val})} isPrintMode={isPrintMode} />
                       <SmartSelect label="付款期限 Payment Terms" options={PAYMENT_TERMS} value={formData.paymentTerms} onChange={(val) => setFormData({...formData, paymentTerms: val})} isPrintMode={isPrintMode} />
                       <NoteSelector value={formData.notes} onChange={(val) => setFormData({...formData, notes: val})} isPrintMode={isPrintMode} />
                     </div>
