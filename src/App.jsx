@@ -18,12 +18,13 @@ import {
   serverTimestamp,
   where,
   getDocs,
-  orderBy, // 新增
-  limit    // 新增
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import { 
   Plus, Trash2, FileText, Users, Printer, Save, Copy, 
-  ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, Stamp, ListPlus, X, Search, Edit, RotateCcw, FileCheck, ClipboardList, RefreshCw
+  ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, Stamp, ListPlus, X, Search, Edit, RotateCcw, FileCheck, ClipboardList, RefreshCw,
+  ChevronDown, ChevronRight, History // ✨ 新增圖示
 } from 'lucide-react';
 
 // --- 設定區：預設圖檔路徑 ---
@@ -87,7 +88,6 @@ const getNextQuoteNumber = async (dbInstance, currentAppId) => {
   const prefix = `J-${yy}-${mm}`; // 例如：J-25-12
 
   try {
-    // 1. 去資料庫找最後一筆報價單 (依照單號倒序排列，只取 1 筆)
     const q = query(
       collection(dbInstance, 'artifacts', currentAppId, 'public', 'data', 'quotations'),
       orderBy('quoteNumber', 'desc'),
@@ -97,24 +97,19 @@ const getNextQuoteNumber = async (dbInstance, currentAppId) => {
 
     if (!snapshot.empty) {
       const lastId = snapshot.docs[0].data().quoteNumber;
-      // 2. 如果最後一筆單號是這個月的 (例如 J-25-12 開頭)
       if (lastId && lastId.startsWith(prefix)) {
-        // 3. 擷取後三碼並 +1
-        // 考慮到可能有 -V 版本號，先移除版本號再取後三碼
         const baseId = lastId.split('-V')[0]; 
         const lastSeq = parseInt(baseId.slice(-3)); 
         
         if (!isNaN(lastSeq)) {
           const nextSeq = String(lastSeq + 1).padStart(3, '0');
-          return `${prefix}${nextSeq}`; // 回傳流水號，例如 J-25-12002
+          return `${prefix}${nextSeq}`; 
         }
       }
     }
-    // 4. 如果資料庫沒資料，或是這個月的第一筆，就從 001 開始
     return `${prefix}001`;
   } catch (error) {
     console.error("流水號生成失敗，使用亂數代替:", error);
-    // 如果發生錯誤(例如網路問題)，回退到原本的亂數邏輯
     const randomSeq = String(Math.floor(Math.random() * 999) + 1).padStart(3, '0');
     return `${prefix}${randomSeq}`;
   }
@@ -340,16 +335,16 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('quotes');
   
-  // 新增篩選狀態
+  // 篩選與展開狀態
   const [statusFilter, setStatusFilter] = useState('all');
   const [customerFilter, setCustomerFilter] = useState('all');
+  const [expandedGroups, setExpandedGroups] = useState(new Set()); // ✨ 記錄展開的群組
 
   useEffect(() => {
     document.title = "傑太環境工程報價系統";
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // 預設按時間排序，方便後續處理
       docs.sort((a, b) => (b.updatedAt?.seconds || b.createdAt?.seconds || 0) - (a.updatedAt?.seconds || a.createdAt?.seconds || 0));
       setQuotes(docs);
       setLoading(false);
@@ -378,7 +373,7 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
     if (confirm(`確定要複製「${quote.projectName || quote.quoteNumber}」嗎？`)) {
       const newQuote = {
         ...quote,
-        quoteNumber: await getNextQuoteNumber(db, appId), // 這裡也改用自動流水號
+        quoteNumber: await getNextQuoteNumber(db, appId),
         projectName: `${quote.projectName || '專案'} (複製)`,
         status: 'draft',
         version: 1,
@@ -387,12 +382,10 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
-      // 移除舊的 id
       delete newQuote.id;
       
       try {
         const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'), newQuote);
-        // 複製成功後直接進入編輯
         onDuplicate(docRef.id);
       } catch (err) {
         console.error('複製失敗:', err);
@@ -401,15 +394,21 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
     }
   };
 
-  // ----------------------------------------------------------------
-  // 新邏輯：先篩選 (Filter) -> 再摺疊 (Group/Fold Versions)
-  // ----------------------------------------------------------------
+  // 切換展開/收合
+  const toggleGroup = (baseNumber) => {
+    const newSet = new Set(expandedGroups);
+    if (newSet.has(baseNumber)) {
+      newSet.delete(baseNumber);
+    } else {
+      newSet.add(baseNumber);
+    }
+    setExpandedGroups(newSet);
+  };
 
-  // 1. 第一階段：過濾資料 (搜尋、狀態、客戶)
+  // 1. 第一階段：過濾資料
   const filteredRawQuotes = useMemo(() => {
     let result = quotes;
 
-    // 搜尋關鍵字
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
       result = result.filter(q => 
@@ -419,12 +418,10 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
       );
     }
     
-    // 狀態篩選
     if (statusFilter !== 'all') {
       result = result.filter(q => q.status === statusFilter);
     }
     
-    // 客戶篩選
     if (customerFilter !== 'all') {
       result = result.filter(q => q.clientName === customerFilter);
     }
@@ -432,35 +429,41 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
     return result;
   }, [quotes, searchTerm, statusFilter, customerFilter]);
 
-  // 2. 第二階段：針對「篩選後的結果」進行摺疊 (取該結果中的最新版)
+  // 2. 第二階段：摺疊 (Group) 並保留歷史資料
   const displayedQuotes = useMemo(() => {
     const groups = {};
     
     filteredRawQuotes.forEach(quote => {
-      // 取得底號 (移除 -V數字)
-      // 例如: J-25-12001-V2 -> J-25-12001
       const baseNumber = quote.quoteNumber ? quote.quoteNumber.replace(/-V\d+$/, '') : 'unknown';
       
-      // 比較並保留版本號最大的
       if (!groups[baseNumber]) {
-        groups[baseNumber] = quote;
-      } else {
-        const currentVer = quote.version || 1;
-        const storedVer = groups[baseNumber].version || 1;
-        // 如果目前這張版本比較大，就取代舊的
-        if (currentVer > storedVer) {
-          groups[baseNumber] = quote;
-        }
+        groups[baseNumber] = [];
       }
+      groups[baseNumber].push(quote);
     });
 
-    // 轉回陣列並依照更新時間排序
-    return Object.values(groups).sort((a, b) => 
+    const result = [];
+    Object.keys(groups).forEach(baseNum => {
+      const versions = groups[baseNum];
+      // 依照版本號倒序排列 (V3, V2, V1...)
+      versions.sort((a, b) => (b.version || 0) - (a.version || 0));
+      
+      // 取出最新版作為主要顯示項目
+      const latest = { ...versions[0] };
+      // 其餘的作為歷史紀錄
+      latest.history = versions.slice(1);
+      latest.baseNumber = baseNum; // 方便 key 使用
+      
+      result.push(latest);
+    });
+
+    // 依照更新時間排序
+    return result.sort((a, b) => 
       (b.updatedAt?.seconds || b.createdAt?.seconds || 0) - (a.updatedAt?.seconds || a.createdAt?.seconds || 0)
     );
   }, [filteredRawQuotes]);
 
-  // 3. Tab 分類 (進行中 vs 已成交) - 來源改為 displayedQuotes
+  // 3. Tab 分類
   const tabFilteredQuotes = useMemo(() => {
     return displayedQuotes.filter(q => {
       if (activeTab === 'quotes') {
@@ -471,7 +474,7 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
     });
   }, [displayedQuotes, activeTab]);
 
-  // 4. 統計數據 - 來源改為 displayedQuotes (確保金額不重複計算)
+  // 4. 統計數據
   const stats = useMemo(() => {
     const inProgress = displayedQuotes.filter(q => ['draft', 'sent', 'confirmed', 'cancelled'].includes(q.status) || !q.status);
     const ordered = displayedQuotes.filter(q => q.status === 'ordered');
@@ -485,7 +488,6 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
     };
   }, [displayedQuotes]);
 
-  // 取得唯一客戶列表（用於篩選下拉選單）
   const uniqueClients = useMemo(() => {
     const clients = [...new Set(quotes.map(q => q.clientName).filter(Boolean))];
     return clients.sort();
@@ -567,7 +569,6 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
       {/* 搜尋與篩選列 */}
       <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
         <div className="flex flex-col md:flex-row gap-3 items-start md:items-center">
-          {/* 搜尋框 */}
           <div className="relative w-full md:w-64">
             <input 
               type="text" 
@@ -579,7 +580,6 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
           </div>
           
-          {/* 狀態篩選 */}
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-500 whitespace-nowrap">狀態：</label>
             <select
@@ -596,7 +596,6 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
             </select>
           </div>
           
-          {/* 客戶篩選 */}
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-500 whitespace-nowrap">客戶：</label>
             <select
@@ -611,7 +610,6 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
             </select>
           </div>
           
-          {/* 清除篩選按鈕 */}
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
@@ -622,7 +620,6 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
           )}
         </div>
         
-        {/* 顯示篩選結果數量 */}
         {hasActiveFilters && (
           <div className="mt-3 text-sm text-gray-500">
             篩選結果：共 <span className="font-bold text-teal-600">{displayedQuotes.length}</span> 筆資料
@@ -671,57 +668,128 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
             <tbody className="bg-white divide-y divide-gray-200">
               {tabFilteredQuotes.map((quote) => {
                 const status = statusConfig[quote.status] || statusConfig.draft;
+                const hasHistory = quote.history && quote.history.length > 0;
+                const isExpanded = expandedGroups.has(quote.baseNumber);
+
                 return (
-                  <tr 
-                    key={quote.id} 
-                    onClick={() => onEdit(quote.id)}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div>
-                          <div className="text-sm font-bold text-teal-700">{quote.quoteNumber}</div>
-                          <div className="text-sm text-gray-900 font-medium">{quote.projectName || '未命名專案'}</div>
-                          {quote.version > 1 && <span className="text-xs bg-purple-100 text-purple-700 px-1.5 rounded-full">V{quote.version}</span>}
+                  <React.Fragment key={quote.id}>
+                    <tr 
+                      onClick={() => onEdit(quote.id)}
+                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-start">
+                          {/* 展開/收合按鈕 */}
+                          <div className="mr-2 mt-1">
+                            {hasHistory ? (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); toggleGroup(quote.baseNumber); }}
+                                className="p-1 rounded-full text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+                                title="檢視歷史版本"
+                              >
+                                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                              </button>
+                            ) : (
+                              <div className="w-6 h-6"></div> // 佔位，保持對齊
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm font-bold text-teal-700">{quote.quoteNumber}</div>
+                              {hasHistory && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded border border-gray-200">最新</span>}
+                            </div>
+                            <div className="text-sm text-gray-900 font-medium">{quote.projectName || '未命名專案'}</div>
+                            {quote.version > 1 && <span className="text-xs bg-purple-100 text-purple-700 px-1.5 rounded-full">V{quote.version}</span>}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">{quote.clientName}</div>
-                      <div className="text-xs text-gray-500">{quote.date}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-xs text-gray-500">
-                        {formatTimestamp(quote.updatedAt || quote.createdAt)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${status.color}`}>
-                        {status.label}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right text-sm font-bold text-gray-900">
-                      NT$ {quote.grandTotal?.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-1">
-                        <button 
-                          onClick={(e) => handleDuplicate(e, quote)} 
-                          className="text-gray-400 hover:text-teal-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
-                          title="複製此報價單"
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">{quote.clientName}</div>
+                        <div className="text-xs text-gray-500">{quote.date}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-xs text-gray-500">
+                          {formatTimestamp(quote.updatedAt || quote.createdAt)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${status.color}`}>
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm font-bold text-gray-900">
+                        NT$ {quote.grandTotal?.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm font-medium">
+                        <div className="flex items-center justify-end gap-1">
+                          <button 
+                            onClick={(e) => handleDuplicate(e, quote)} 
+                            className="text-gray-400 hover:text-teal-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                            title="複製此報價單"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={(e) => handleDelete(e, quote.id)} 
+                            className="text-gray-400 hover:text-red-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                            title="刪除"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* 歷史版本渲染區塊 */}
+                    {isExpanded && quote.history.map((hQuote) => {
+                      const hStatus = statusConfig[hQuote.status] || statusConfig.draft;
+                      return (
+                        <tr 
+                          key={hQuote.id} 
+                          onClick={() => onEdit(hQuote.id)}
+                          className="bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors border-t border-gray-100"
                         >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={(e) => handleDelete(e, quote.id)} 
-                          className="text-gray-400 hover:text-red-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
-                          title="刪除"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                          <td className="px-6 py-3 pl-14 relative">
+                            <div className="absolute left-10 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+                            <div className="flex items-center opacity-70">
+                              <div>
+                                <div className="text-xs font-mono text-gray-500">{hQuote.quoteNumber}</div>
+                                <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 rounded-full">歷史 V{hQuote.version}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 opacity-70">
+                            <div className="text-xs text-gray-500">{hQuote.date}</div>
+                          </td>
+                          <td className="px-6 py-3 opacity-70">
+                            <div className="text-xs text-gray-400">
+                              {formatTimestamp(hQuote.updatedAt || hQuote.createdAt)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap opacity-70">
+                            <span className={`px-2 inline-flex text-[10px] leading-4 font-semibold rounded-full border ${hStatus.color} opacity-70`}>
+                              {hStatus.label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-right text-xs font-medium text-gray-500 opacity-70">
+                            NT$ {hQuote.grandTotal?.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-3 text-right text-xs font-medium">
+                            {/* 歷史版本通常只允許複製或刪除 */}
+                            <div className="flex items-center justify-end gap-1 opacity-50 hover:opacity-100">
+                               <button 
+                                onClick={(e) => handleDuplicate(e, hQuote)} 
+                                className="text-gray-400 hover:text-teal-600 p-1.5"
+                                title="複製舊版"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
                 );
               })}
               {tabFilteredQuotes.length === 0 && (
@@ -1053,6 +1121,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                       <div className="pt-1">
                         <h1 className="text-3xl font-bold text-teal-900 tracking-wider mb-2">報 價 單</h1>
                         <h2 className="text-lg font-bold text-gray-700">傑太環境工程顧問有限公司</h2>
+                        {/* 這是公司資訊區塊的開始 */}
                         <div className="mt-4 text-sm text-gray-600 space-y-0.5 leading-relaxed">
                           <p>統一編號：<span className="font-medium">60779653</span></p>
                           <p>地　　址：新北市土城區金城路二段245巷40號1F</p>
@@ -1085,6 +1154,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                             )}
                           </div>
                         </div>
+                        {/* 這是公司資訊區塊的結束 */}
                       </div>
                     </div>
 
@@ -1272,7 +1342,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                 <div className="pt-4 page-break-inside-avoid">
                   <div className="flex flex-col md:flex-row gap-8 break-inside-avoid">
                     <div className="flex-1 space-y-4">
-                      <SmartSelect label="付款方式 Payment Method" options={PAYMENT_METHODS} value={formData.paymentMethod} onChange={(val) => setFormData({...formData,paymentMethod: val})} isPrintMode={isPrintMode} />
+                      <SmartSelect label="付款方式 Payment Method" options={PAYMENT_METHODS} value={formData.paymentMethod} onChange={(val) => setFormData({...formData, paymentMethod: val})} isPrintMode={isPrintMode} />
                       <SmartSelect label="付款期限 Payment Terms" options={PAYMENT_TERMS} value={formData.paymentTerms} onChange={(val) => setFormData({...formData, paymentTerms: val})} isPrintMode={isPrintMode} />
                       <NoteSelector value={formData.notes} onChange={(val) => setFormData({...formData, notes: val})} isPrintMode={isPrintMode} />
                     </div>
