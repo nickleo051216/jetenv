@@ -1249,7 +1249,8 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                     </div>
                   </section>
 
-                <section className="mb-8 min-h-[300px]">
+                {/* 👇 修改：如果是列印模式 (isPrintMode) 就設為 min-h-0 (無高度限制)，否則維持 300px */}
+                  <section className={`mb-8 ${isPrintMode ? 'min-h-0' : 'min-h-[300px]'}`}>
                   <table className="min-w-full divide-y divide-gray-300 border-t border-b border-gray-300 table-fixed">
                     <thead className="bg-teal-50">
                       <tr>
