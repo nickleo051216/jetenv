@@ -50,8 +50,7 @@ const db = getFirestore(app);
 const appId = 'jietai-prod';
 
 // --- n8n API 設定 (經濟部公司查詢) ---
-// ⚠️ 請將此 URL 換成你的 n8n Webhook 網址
-const N8N_MOEA_API_URL = 'https://你的n8n網址.zeabur.app/webhook/moea';
+const N8N_MOEA_API_URL = 'https://jetenv.zeabur.app/webhook/ipas-conpanynumber';
 
 // --- Constants & Options ---
 const PAYMENT_METHODS = ['匯款', '支票', '現金'];
