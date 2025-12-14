@@ -1,0 +1,221 @@
+{
+    "name": "經濟部公司查詢 API",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "GET",
+                "path": "moea",
+                "responseMode": "responseNode",
+                "options": {
+                    "allowedOrigins": "*"
+                }
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                0,
+                0
+            ],
+            "id": "webhook-moea",
+            "name": "MOEA Webhook"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "id": "check-taxid",
+                            "leftValue": "={{ $json.query.taxId }}",
+                            "rightValue": "",
+                            "operator": {
+                                "type": "string",
+                                "operation": "exists",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                220,
+                0
+            ],
+            "id": "check-taxid-exists",
+            "name": "檢查統編參數"
+        },
+        {
+            "parameters": {
+                "url": "=http://data.gcis.nat.gov.tw/od/data/api/5F64D864-61CB-4D0D-8AD9-492047CC1EA6?$format=json&$filter=Business_Accounting_NO eq {{ $json.query.taxId }}&$skip=0&$top=1",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                440,
+                -100
+            ],
+            "id": "fetch-basic-info",
+            "name": "查詢公司基本資料"
+        },
+        {
+            "parameters": {
+                "url": "=http://data.gcis.nat.gov.tw/od/data/api/426D5542-71FC-4547-9C54-30BDFE20C2CA?$format=json&$filter=Business_Accounting_NO eq {{ $('MOEA Webhook').item.json.query.taxId }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "neverError": true
+                        }
+                    }
+                }
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                660,
+                -100
+            ],
+            "id": "fetch-business-items",
+            "name": "查詢營業項目"
+        },
+        {
+            "parameters": {
+                "jsCode": "// 取得基本資料\nconst basicData = $('查詢公司基本資料').first().json;\nconst itemsData = $input.first().json;\n\n// 如果查無資料\nif (!basicData || (Array.isArray(basicData) && basicData.length === 0)) {\n  return { found: false };\n}\n\nconst company = Array.isArray(basicData) ? basicData[0] : basicData;\n\n// 格式化營業項目\nlet industryStats = [];\nif (Array.isArray(itemsData)) {\n  industryStats = itemsData.map(item => {\n    const code = item.Business_Seq_NO || '';\n    const name = item.Business_Item || item.Business_Item_Desc || '';\n    return `${code} ${name}`.trim();\n  }).filter(item => item.length > 0);\n}\n\nreturn {\n  found: true,\n  data: {\n    taxId: company.Business_Accounting_NO,\n    name: company.Company_Name,\n    status: company.Company_Status_Desc,\n    representative: company.Responsible_Name,\n    address: company.Company_Location,\n    capital: company.Capital_Stock_Amount,\n    industryStats: industryStats\n  }\n};"
+            },
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                880,
+                -100
+            ],
+            "id": "format-response",
+            "name": "格式化回傳資料"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.stringify($json) }}",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            }
+                        ]
+                    }
+                }
+            },
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                1100,
+                -100
+            ],
+            "id": "respond-success",
+            "name": "回傳成功"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\"error\": \"統編參數 (taxId) 為必填\", \"found\": false}",
+                "options": {
+                    "responseCode": 400,
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            }
+                        ]
+                    }
+                }
+            },
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                440,
+                100
+            ],
+            "id": "respond-error",
+            "name": "回傳錯誤"
+        }
+    ],
+    "connections": {
+        "MOEA Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "檢查統編參數",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "檢查統編參數": {
+            "main": [
+                [
+                    {
+                        "node": "查詢公司基本資料",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "回傳錯誤",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "查詢公司基本資料": {
+            "main": [
+                [
+                    {
+                        "node": "查詢營業項目",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "查詢營業項目": {
+            "main": [
+                [
+                    {
+                        "node": "格式化回傳資料",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "格式化回傳資料": {
+            "main": [
+                [
+                    {
+                        "node": "回傳成功",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "templateCredsSetupCompleted": true
+    }
+}

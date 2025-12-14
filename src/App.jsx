@@ -49,6 +49,10 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = 'jietai-prod';
 
+// --- n8n API 設定 (經濟部公司查詢) ---
+// ⚠️ 請將此 URL 換成你的 n8n Webhook 網址
+const N8N_MOEA_API_URL = 'https://你的n8n網址.zeabur.app/webhook/moea';
+
 // --- Constants & Options ---
 const PAYMENT_METHODS = ['匯款', '支票', '現金'];
 const PAYMENT_TERMS = [
@@ -631,8 +635,8 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
         <button
           onClick={() => setActiveTab('quotes')}
           className={`flex items-center py-2 px-6 border-b-2 font-medium text-sm transition-colors ${activeTab === 'quotes'
-              ? 'border-teal-600 text-teal-700'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            ? 'border-teal-600 text-teal-700'
+            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
         >
           <ClipboardList className="w-4 h-4 mr-2" />
@@ -641,8 +645,8 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
         <button
           onClick={() => setActiveTab('orders')}
           className={`flex items-center py-2 px-6 border-b-2 font-medium text-sm transition-colors ${activeTab === 'orders'
-              ? 'border-green-600 text-green-700'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            ? 'border-green-600 text-green-700'
+            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
         >
           <FileCheck className="w-4 h-4 mr-2" />
@@ -1240,7 +1244,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
                   </div>
                   <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                     <div className="flex items-center"><span className="w-20 text-gray-500">客戶名稱：</span>{isPrintMode ? <span className="flex-1 font-medium text-gray-900">{formData.clientName}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent font-medium text-gray-900" value={formData.clientName} onChange={e => setFormData({ ...formData, clientName: e.target.value })} />}</div>
-                    <div className="flex items-center"><span className="w-20 text-gray-500">統一編號：</span>{isPrintMode ? <span className="flex-1 text-gray-900">{formData.clientTaxId}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent" value={formData.clientTaxId} onChange={e => setFormData({ ...formData, clientTaxId: e.target.value })} />}</div>
+                    <div className="flex items-center">{isPrintMode ? <><span className="w-20 text-gray-500">統一編號：</span><span className="flex-1 text-gray-900">{formData.clientTaxId}</span></> : <><span className="w-20 text-gray-500">統一編號：</span><input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent" value={formData.clientTaxId} onChange={e => setFormData({ ...formData, clientTaxId: e.target.value })} maxLength={8} /><button type="button" onClick={async () => { if (!formData.clientTaxId || formData.clientTaxId.length !== 8) { alert('請輸入正確的 8 碼統編'); return; } try { const res = await fetch(`${N8N_MOEA_API_URL}?taxId=${formData.clientTaxId}`); const data = await res.json(); if (data.found && data.data) { setFormData(prev => ({ ...prev, clientName: data.data.name || prev.clientName, clientAddress: data.data.address || prev.clientAddress, clientContact: data.data.representative || prev.clientContact })); alert(`✅ 已帶入：${data.data.name}`); } else { alert('❌ 查無此統編資料'); } } catch (err) { console.error(err); alert('查詢失敗，請稍後再試'); } }} className="ml-2 px-2 py-0.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">🔍</button></>}</div>
                     <div className="flex items-center"><span className="w-20 text-gray-500">聯絡人：</span>{isPrintMode ? <span className="flex-1 text-gray-900">{formData.clientContact}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent" value={formData.clientContact} onChange={e => setFormData({ ...formData, clientContact: e.target.value })} />}</div>
                     <div className="flex items-center"><span className="w-20 text-gray-500">電話：</span>{isPrintMode ? <span className="flex-1 text-gray-900">{formData.clientPhone}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent" value={formData.clientPhone} onChange={e => setFormData({ ...formData, clientPhone: e.target.value })} />}</div>
                     <div className="flex items-center col-span-2"><span className="w-20 text-gray-500">地址：</span>{isPrintMode ? <span className="flex-1 text-gray-900">{formData.clientAddress}</span> : <input className="flex-1 border-0 border-b border-gray-200 py-0 px-1 focus:ring-0 focus:border-teal-500 bg-transparent" value={formData.clientAddress} onChange={e => setFormData({ ...formData, clientAddress: e.target.value })} />}</div>
@@ -1572,7 +1576,39 @@ const CustomerManager = () => {
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <input className="input-std md:col-span-2" placeholder="公司名稱 *" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-          <input className="input-std" placeholder="統一編號" value={form.taxId} onChange={e => setForm({ ...form, taxId: e.target.value })} />
+          <div className="flex gap-2 items-center">
+            <input className="input-std flex-1" placeholder="統一編號 (8碼)" value={form.taxId} onChange={e => setForm({ ...form, taxId: e.target.value })} maxLength={8} />
+            <button
+              type="button"
+              onClick={async () => {
+                if (!form.taxId || form.taxId.length !== 8) {
+                  alert('請輸入正確的 8 碼統編');
+                  return;
+                }
+                try {
+                  const res = await fetch(`${N8N_MOEA_API_URL}?taxId=${form.taxId}`);
+                  const data = await res.json();
+                  if (data.found && data.data) {
+                    setForm(prev => ({
+                      ...prev,
+                      name: data.data.name || prev.name,
+                      address: data.data.address || prev.address,
+                      contact: data.data.representative || prev.contact
+                    }));
+                    alert(`✅ 已帶入：${data.data.name}`);
+                  } else {
+                    alert('❌ 查無此統編資料');
+                  }
+                } catch (err) {
+                  console.error(err);
+                  alert('查詢失敗，請稍後再試');
+                }
+              }}
+              className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm whitespace-nowrap"
+            >
+              🔍 查詢
+            </button>
+          </div>
           <input className="input-std" placeholder="聯絡人" value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} />
           <input className="input-std" placeholder="電話" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
           <input className="input-std" placeholder="傳真" value={form.fax} onChange={e => setForm({ ...form, fax: e.target.value })} />
