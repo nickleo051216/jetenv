@@ -34,13 +34,13 @@ const DEFAULT_STAMP_PATH = '/stamp.png';
 // --- Firebase Configuration 設定區 ---
 // ⚠️ 請記得將下方的 "請在此填入..." 換成你真實的 Firebase 設定
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: "AIzaSyCrvR0Ir8xttLtwEJz2K3bhXKAFyyDk5RA",
+  authDomain: "jetenv-a82bc.firebaseapp.com",
+  projectId: "jetenv-a82bc",
+  storageBucket: "jetenv-a82bc.firebasestorage.app",
+  messagingSenderId: "816919171168",
+  appId: "1:816919171168:web:77d028486a01cb40597305",
+  measurementId: "G-THZB1LZ7DK"
 };
 
 // 初始化 Firebase
