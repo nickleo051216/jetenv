@@ -1005,9 +1005,9 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     } catch (e) { console.error("產品同步失敗", e); }
   };
 
-  const save = async (silent = false) => {
+  const save = async (silent = false, updates = {}) => {
     if (!silent) setSaving(true);
-    const payload = { ...formData, subtotal, tax, grandTotal, updatedAt: serverTimestamp() };
+    const payload = { ...formData, ...updates, subtotal, tax, grandTotal, updatedAt: serverTimestamp() };
     try {
       if (quoteId) {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', quoteId), payload);
@@ -1017,7 +1017,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         });
         if (!quoteId) setActiveQuoteId(ref.id);
       }
-      await syncCustomerData(formData.clientName, formData);
+      await syncCustomerData(updates.clientName || formData.clientName, { ...formData, ...updates });
       await syncProductData(formData.items);
     } catch (e) { console.error(e); alert('儲存失敗'); }
     if (!silent) setSaving(false);
@@ -1465,8 +1465,10 @@ ${formData.companyContact || '張惟荏'}
       }
 
       // 更新狀態為「已發送」
-      setFormData(prev => ({ ...prev, status: 'sent' }));
-      await save(true);
+      const newStatus = 'sent';
+      setFormData(prev => ({ ...prev, status: newStatus }));
+      // 傳入 newStatus 以確保儲存時狀態正確更新 (避免閉包取到舊 formData)
+      await save(true, { status: newStatus });
 
       alert(`✅ 報價單已成功寄送至 ${formData.clientEmail}`);
 
