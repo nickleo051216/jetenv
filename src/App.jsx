@@ -1046,94 +1046,332 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     onBack();
   };
 
-  // --- 生成報價單 Markdown ---
-  const generateQuoteMarkdown = () => {
-    // 生成項目表格
-    const itemsTable = formData.items.map((item, idx) =>
-      `| ${idx + 1} | ${item.name || '-'} | ${item.spec || '-'} | ${item.frequency || '-'} | ${item.unit || '-'} | ${item.qty || 0} | ${(item.price || 0).toLocaleString()} | ${((item.price || 0) * (item.qty || 0)).toLocaleString()} |`
-    ).join('\n');
+  // --- 生成報價單 HTML (供 n8n 用 puppeteer 轉 PDF) ---
+  const generateQuoteHtml = () => {
+    const itemsHtml = formData.items.map((item, idx) => `
+      <tr>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #6b7280;">${idx + 1}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #111827;">${item.name || ''}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">${item.spec || ''}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #374151;">${item.frequency || ''}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #374151;">${item.unit || ''}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${item.qty || 0}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${(item.price || 0).toLocaleString()}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600; color: #111827;">${((item.price || 0) * (item.qty || 0)).toLocaleString()}</td>
+      </tr>
+    `).join('');
 
-    return `# 報 價 單
+    return `<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>報價單 - ${formData.quoteNumber}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif; 
+      padding: 40px; 
+      color: #333; 
+      background: #fff;
+      line-height: 1.5;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    
+    /* Header */
+    .header { 
+      display: flex; 
+      justify-content: space-between; 
+      border-bottom: 3px solid #0d9488; 
+      padding-bottom: 24px; 
+      margin-bottom: 24px; 
+    }
+    .company-info h1 { 
+      color: #0d9488; 
+      font-size: 32px; 
+      letter-spacing: 8px;
+      margin-bottom: 8px;
+    }
+    .company-info h2 { 
+      color: #374151; 
+      font-size: 18px; 
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .company-details { font-size: 13px; color: #6b7280; }
+    .company-details p { margin: 4px 0; }
+    
+    /* Quote Info */
+    .quote-info { text-align: right; min-width: 240px; }
+    .quote-info-row { 
+      display: flex; 
+      justify-content: space-between; 
+      margin: 6px 0; 
+      font-size: 13px; 
+    }
+    .quote-info-label { color: #6b7280; }
+    .quote-number { font-size: 16px; font-weight: 700; color: #0d9488; }
+    .project-box { 
+      background: #f0fdfa; 
+      padding: 12px 16px; 
+      border-radius: 8px; 
+      border: 1px solid #99f6e4; 
+      margin-top: 12px;
+      text-align: left;
+    }
+    .project-label { font-size: 11px; font-weight: 700; color: #0d9488; margin-bottom: 4px; }
+    .project-name { font-size: 14px; color: #134e4a; font-weight: 500; }
+    
+    /* Section */
+    .section-title { 
+      font-weight: 700; 
+      color: #374151; 
+      font-size: 14px;
+      border-bottom: 1px solid #e5e7eb; 
+      padding-bottom: 8px; 
+      margin: 24px 0 16px 0; 
+    }
+    
+    /* Client Info */
+    .client-grid { 
+      display: grid; 
+      grid-template-columns: 1fr 1fr; 
+      gap: 8px 24px; 
+      font-size: 13px; 
+    }
+    .client-row { display: flex; }
+    .client-label { color: #6b7280; min-width: 70px; }
+    .client-value { color: #111827; }
+    .client-value.highlight { font-weight: 600; }
+    .client-row.full { grid-column: span 2; }
+    
+    /* Table */
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin: 20px 0; 
+      font-size: 13px;
+    }
+    th { 
+      background: #f0fdfa; 
+      color: #0d9488; 
+      padding: 12px 8px; 
+      text-align: left; 
+      font-size: 12px; 
+      font-weight: 700; 
+      border-bottom: 2px solid #0d9488;
+      text-transform: uppercase;
+    }
+    th.center { text-align: center; }
+    th.right { text-align: right; }
+    
+    /* Summary */
+    .summary { 
+      display: flex; 
+      justify-content: space-between; 
+      margin-top: 32px; 
+      gap: 32px;
+    }
+    .notes-section { flex: 1; }
+    .notes-title { 
+      font-size: 11px; 
+      font-weight: 700; 
+      color: #6b7280; 
+      text-transform: uppercase;
+      margin-bottom: 8px; 
+    }
+    .notes-content { 
+      font-size: 12px; 
+      color: #374151; 
+      white-space: pre-wrap; 
+      line-height: 1.7; 
+    }
+    .notes-block { margin-bottom: 16px; }
+    
+    /* Totals */
+    .totals-box { 
+      width: 280px; 
+      background: #f9fafb; 
+      padding: 20px; 
+      border-radius: 8px; 
+      border: 1px solid #e5e7eb; 
+    }
+    .total-row { 
+      display: flex; 
+      justify-content: space-between; 
+      margin: 8px 0; 
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .total-row.grand { 
+      border-top: 1px solid #d1d5db; 
+      padding-top: 12px; 
+      margin-top: 12px; 
+    }
+    .total-row.grand span:first-child { font-weight: 700; color: #111827; font-size: 14px; }
+    .total-row.grand span:last-child { font-weight: 700; font-size: 20px; color: #0d9488; }
+    .currency-note { text-align: right; font-size: 11px; color: #9ca3af; margin-top: 8px; }
+    
+    /* Signatures */
+    .signatures { 
+      display: flex; 
+      justify-content: space-between; 
+      margin-top: 60px; 
+      gap: 48px;
+    }
+    .signature-box { flex: 1; text-align: center; }
+    .signature-line { 
+      border-bottom: 1px solid #333; 
+      height: 50px; 
+      margin-bottom: 8px; 
+    }
+    .signature-label { font-size: 12px; font-weight: 600; color: #6b7280; }
+    
+    /* Footer */
+    .footer { 
+      margin-top: 48px; 
+      padding-top: 16px; 
+      border-top: 1px solid #e5e7eb; 
+      text-align: center; 
+      font-size: 11px; 
+      color: #9ca3af; 
+    }
+    .footer a { color: #0d9488; text-decoration: none; font-weight: 600; }
+    
+    @media print {
+      body { padding: 20px; }
+      @page { margin: 15mm; size: A4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="company-info">
+        <h1>報 價 單</h1>
+        <h2>傑太環境工程顧問有限公司</h2>
+        <div class="company-details">
+          <p>統一編號：60779653</p>
+          <p>地址：新北市土城區金城路二段245巷40號1F</p>
+          <p>電話：${formData.companyPhone || '02-6609-5888 #103'}</p>
+          <p>聯絡人：${formData.companyContact || '張惟荏'}</p>
+        </div>
+      </div>
+      <div class="quote-info">
+        <div class="quote-info-row">
+          <span class="quote-info-label">報價單號：</span>
+          <span class="quote-number">${formData.quoteNumber}</span>
+        </div>
+        <div class="quote-info-row">
+          <span class="quote-info-label">報價日期：</span>
+          <span>${formData.date}</span>
+        </div>
+        <div class="quote-info-row">
+          <span class="quote-info-label">有效期限：</span>
+          <span>${formData.validUntil}</span>
+        </div>
+        <div class="project-box">
+          <div class="project-label">專案名稱 Project Name</div>
+          <div class="project-name">${formData.projectName || '-'}</div>
+        </div>
+      </div>
+    </div>
 
-## 傑太環境工程顧問有限公司
+    <div class="section-title">客戶資料 Customer</div>
+    <div class="client-grid">
+      <div class="client-row">
+        <span class="client-label">客戶名稱：</span>
+        <span class="client-value highlight">${formData.clientName || '-'}</span>
+      </div>
+      <div class="client-row">
+        <span class="client-label">統一編號：</span>
+        <span class="client-value">${formData.clientTaxId || '-'}</span>
+      </div>
+      <div class="client-row">
+        <span class="client-label">聯絡人：</span>
+        <span class="client-value">${formData.clientContact || '-'}</span>
+      </div>
+      <div class="client-row">
+        <span class="client-label">電話：</span>
+        <span class="client-value">${formData.clientPhone || '-'}</span>
+      </div>
+      <div class="client-row full">
+        <span class="client-label">地址：</span>
+        <span class="client-value">${formData.clientAddress || '-'}</span>
+      </div>
+      <div class="client-row full">
+        <span class="client-label">Email：</span>
+        <span class="client-value">${formData.clientEmail || '-'}</span>
+      </div>
+    </div>
 
-| 項目 | 內容 |
-|------|------|
-| 統一編號 | 60779653 |
-| 地址 | 新北市土城區金城路二段245巷40號1F |
-| 電話 | ${formData.companyPhone || '02-6609-5888 #103'} |
-| 聯絡人 | ${formData.companyContact || '張惟荏'} |
+    <table>
+      <thead>
+        <tr>
+          <th class="center" style="width: 40px;">No.</th>
+          <th style="width: 22%;">項目名稱</th>
+          <th style="width: 25%;">規格描述 / 備註</th>
+          <th class="center" style="width: 60px;">頻率</th>
+          <th class="center" style="width: 50px;">單位</th>
+          <th class="right" style="width: 55px;">數量</th>
+          <th class="right" style="width: 75px;">單價</th>
+          <th class="right" style="width: 95px;">複價(NT$)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+      </tbody>
+    </table>
 
----
+    <div class="summary">
+      <div class="notes-section">
+        <div class="notes-block">
+          <div class="notes-title">備註 Notes</div>
+          <div class="notes-content">${formData.notes || '-'}</div>
+        </div>
+        <div class="notes-block">
+          <div class="notes-title">付款方式</div>
+          <div class="notes-content">${formData.paymentMethod || '-'}</div>
+        </div>
+        <div class="notes-block">
+          <div class="notes-title">付款期限</div>
+          <div class="notes-content">${formData.paymentTerms || '-'}</div>
+        </div>
+      </div>
+      <div class="totals-box">
+        <div class="total-row">
+          <span>合計 (Subtotal)</span>
+          <span>NT$ ${subtotal.toLocaleString()}</span>
+        </div>
+        <div class="total-row">
+          <span>營業稅 (Tax 5%)</span>
+          <span>NT$ ${tax.toLocaleString()}</span>
+        </div>
+        <div class="total-row grand">
+          <span>總計 (Total)</span>
+          <span>NT$ ${grandTotal.toLocaleString()}</span>
+        </div>
+        <div class="currency-note">幣別：新台幣 (TWD)</div>
+      </div>
+    </div>
 
-## 報價資訊
+    <div class="signatures">
+      <div class="signature-box">
+        <div class="signature-line"></div>
+        <div class="signature-label">傑太環境工程顧問有限公司 (簽章)</div>
+      </div>
+      <div class="signature-box">
+        <div class="signature-line"></div>
+        <div class="signature-label">客戶確認簽回 (簽章)</div>
+      </div>
+    </div>
 
-| 項目 | 內容 |
-|------|------|
-| **報價單號** | **${formData.quoteNumber}** |
-| 報價日期 | ${formData.date} |
-| 有效期限 | ${formData.validUntil} |
-| **專案名稱** | **${formData.projectName || '-'}** |
-
----
-
-## 客戶資料
-
-| 項目 | 內容 |
-|------|------|
-| **客戶名稱** | **${formData.clientName || '-'}** |
-| 統一編號 | ${formData.clientTaxId || '-'} |
-| 聯絡人 | ${formData.clientContact || '-'} |
-| 電話 | ${formData.clientPhone || '-'} |
-| 地址 | ${formData.clientAddress || '-'} |
-| Email | ${formData.clientEmail || '-'} |
-
----
-
-## 報價明細
-
-| No. | 項目名稱 | 規格描述/備註 | 頻率 | 單位 | 數量 | 單價 | 複價(NT$) |
-|:---:|----------|---------------|:----:|:----:|-----:|-----:|---------:|
-${itemsTable}
-
----
-
-## 金額彙總
-
-| 項目 | 金額 |
-|------|-----:|
-| 合計 (Subtotal) | NT$ ${subtotal.toLocaleString()} |
-| 營業稅 (Tax 5%) | NT$ ${tax.toLocaleString()} |
-| **總計 (Total)** | **NT$ ${grandTotal.toLocaleString()}** |
-
-> 幣別：新台幣 (TWD)
-
----
-
-## 付款資訊
-
-- **付款方式**：${formData.paymentMethod || '-'}
-- **付款期限**：${formData.paymentTerms || '-'}
-
----
-
-## 備註 Notes
-
-${formData.notes || '-'}
-
----
-
-## 簽章欄
-
-| 傑太環境工程顧問有限公司 (簽章) | 客戶確認簽回 (簽章) |
-|:------------------------------:|:-------------------:|
-|                                |                     |
-|                                |                     |
-
----
-
-🌐 [https://www.jetenv.com.tw/](https://www.jetenv.com.tw/) | 傑太環境工程顧問有限公司 | ${formData.quoteNumber}
-`;
+    <div class="footer">
+      <a href="https://www.jetenv.com.tw/">https://www.jetenv.com.tw/</a> | 傑太環境工程顧問有限公司 | ${formData.quoteNumber}
+    </div>
+  </div>
+</body>
+</html>`;
   };
 
   // --- 一鍵寄出功能 ---
@@ -1162,8 +1400,8 @@ ${formData.notes || '-'}
       // 先儲存報價單
       await save(true);
 
-      // 生成 Markdown
-      const quoteMarkdown = generateQuoteMarkdown();
+      // 生成 HTML
+      const quoteHtml = generateQuoteHtml();
 
       // 準備 Email 內容
       const emailData = {
@@ -1176,7 +1414,7 @@ ${formData.notes || '-'}
         grandTotal: grandTotal,
         companyContact: formData.companyContact,
         companyPhone: formData.companyPhone,
-        quoteMarkdown: quoteMarkdown,
+        quoteHtml: quoteHtml,
         // Email 正文草稿
         emailBody: `
 ${formData.clientContact || formData.clientName} 您好，
@@ -1266,10 +1504,10 @@ ${formData.companyContact || '張惟荏'}
               onClick={handleSend}
               disabled={sending || !formData.clientEmail}
               className={`flex items-center px-3 py-2 rounded transition-colors text-xs sm:text-sm border ${sending
-                  ? 'bg-blue-100 text-blue-400 border-blue-200 cursor-not-allowed'
-                  : formData.clientEmail
-                    ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
-                    : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                ? 'bg-blue-100 text-blue-400 border-blue-200 cursor-not-allowed'
+                : formData.clientEmail
+                  ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
+                  : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                 }`}
               title={!formData.clientEmail ? '請先填寫客戶 Email' : '寄送報價單給客戶'}
             >
