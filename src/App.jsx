@@ -455,8 +455,6 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
       groups[baseNumber].push(quote);
     });
 
-    });
-
     const result = [];
     Object.keys(groups).forEach(baseNum => {
       const versions = groups[baseNum];
