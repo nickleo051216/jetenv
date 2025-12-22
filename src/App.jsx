@@ -1765,8 +1765,8 @@ ${formData.companyContact || '張惟荏'}
                     <thead className="bg-teal-50">
                       <tr>
                         <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 w-10">No.</th>
-                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800" style={{ width: '25%', minWidth: '120px' }}>項目名稱</th>
-                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800" style={{ width: '25%', minWidth: '120px' }}>規格描述 / 備註</th>
+                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800" style={{ width: '18%', minWidth: '100px' }}>項目名稱</th>
+                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800" style={{ width: '35%', minWidth: '180px' }}>規格描述 / 備註</th>
                         <th className="px-2 py-2 text-center text-xs font-bold text-teal-800 w-16">頻率</th>
                         <th className="px-2 py-2 text-center text-xs font-bold text-teal-800 w-14">單位</th>
                         <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 w-16">數量</th>
@@ -1781,68 +1781,26 @@ ${formData.companyContact || '張惟荏'}
                           <td className="px-2 py-2 text-xs text-gray-500 align-top pt-3">{idx + 1}</td>
                           <td className="px-2 py-2 align-top">
                             {isPrintMode ? (
-                              <div
-                                className="text-sm font-bold text-gray-900 whitespace-pre-wrap"
-                                style={{
-                                  ...(item.nameBoxWidth ? { width: `${item.nameBoxWidth}px` } : {}),
-                                  ...(item.nameBoxHeight ? { minHeight: `${item.nameBoxHeight}px` } : {})
-                                }}
-                              >{item.name}</div>
+                              <div className="w-full text-sm font-bold text-gray-900 whitespace-pre-wrap">{item.name}</div>
                             ) : (
                               <textarea
                                 className="w-full border border-gray-200 rounded p-2 text-sm font-bold text-gray-900 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white transition-colors"
-                                style={{
-                                  resize: 'both',
-                                  width: item.nameBoxWidth ? `${item.nameBoxWidth}px` : '100%',
-                                  minHeight: item.nameBoxHeight ? `${item.nameBoxHeight}px` : '60px',
-                                  minWidth: '100px'
-                                }}
+                                style={{ resize: 'vertical', minHeight: '60px' }}
                                 value={item.name}
                                 onChange={e => handleItemChange(item.id, 'name', e.target.value)}
-                                onBlur={e => {
-                                  const newWidth = e.target.offsetWidth;
-                                  const newHeight = e.target.offsetHeight;
-                                  if (newWidth > 100 && newWidth !== item.nameBoxWidth) {
-                                    handleItemChange(item.id, 'nameBoxWidth', newWidth);
-                                  }
-                                  if (newHeight > 60 && newHeight !== item.nameBoxHeight) {
-                                    handleItemChange(item.id, 'nameBoxHeight', newHeight);
-                                  }
-                                }}
                                 placeholder="輸入項目名稱..."
                               />
                             )}
                           </td>
                           <td className="px-2 py-2 align-top">
                             {isPrintMode ? (
-                              <div
-                                className="text-xs text-gray-600 whitespace-pre-wrap"
-                                style={{
-                                  ...(item.specBoxWidth ? { width: `${item.specBoxWidth}px` } : {}),
-                                  ...(item.specBoxHeight ? { minHeight: `${item.specBoxHeight}px` } : {})
-                                }}
-                              >{item.spec}</div>
+                              <div className="w-full text-xs text-gray-600 whitespace-pre-wrap">{item.spec}</div>
                             ) : (
                               <textarea
                                 className="w-full border border-gray-200 rounded p-2 text-xs text-gray-600 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white transition-colors placeholder-gray-300"
-                                style={{
-                                  resize: 'both',
-                                  width: item.specBoxWidth ? `${item.specBoxWidth}px` : '100%',
-                                  minHeight: item.specBoxHeight ? `${item.specBoxHeight}px` : '60px',
-                                  minWidth: '100px'
-                                }}
+                                style={{ resize: 'vertical', minHeight: '60px' }}
                                 value={item.spec}
                                 onChange={e => handleItemChange(item.id, 'spec', e.target.value)}
-                                onBlur={e => {
-                                  const newWidth = e.target.offsetWidth;
-                                  const newHeight = e.target.offsetHeight;
-                                  if (newWidth > 100 && newWidth !== item.specBoxWidth) {
-                                    handleItemChange(item.id, 'specBoxWidth', newWidth);
-                                  }
-                                  if (newHeight > 60 && newHeight !== item.specBoxHeight) {
-                                    handleItemChange(item.id, 'specBoxHeight', newHeight);
-                                  }
-                                }}
                                 placeholder="輸入規格描述或備註..."
                               />
                             )}
