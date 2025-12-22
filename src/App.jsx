@@ -963,12 +963,16 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
       qty: 1,
       frequency: '',
       note: '',
+      nameBoxWidth: null,   // 項目名稱欄位寬度 (null = 自動)
       nameBoxHeight: null,  // 項目名稱欄位高度 (null = 自動)
+      specBoxWidth: null,   // 規格描述欄位寬度 (null = 自動)
       specBoxHeight: null   // 規格描述欄位高度 (null = 自動)
     } : {
       id: Date.now(),
       name: '', spec: '', unit: '式', price: 0, qty: 1, frequency: '', note: '',
+      nameBoxWidth: null,
       nameBoxHeight: null,
+      specBoxWidth: null,
       specBoxHeight: null
     };
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
@@ -1778,17 +1782,29 @@ ${formData.companyContact || '張惟荏'}
                           <td className="px-2 py-2 align-top">
                             {isPrintMode ? (
                               <div
-                                className="w-full text-sm font-bold text-gray-900 whitespace-pre-wrap"
-                                style={item.nameBoxHeight ? { minHeight: `${item.nameBoxHeight}px` } : {}}
+                                className="text-sm font-bold text-gray-900 whitespace-pre-wrap"
+                                style={{
+                                  ...(item.nameBoxWidth ? { width: `${item.nameBoxWidth}px` } : {}),
+                                  ...(item.nameBoxHeight ? { minHeight: `${item.nameBoxHeight}px` } : {})
+                                }}
                               >{item.name}</div>
                             ) : (
                               <textarea
                                 className="w-full border border-gray-200 rounded p-2 text-sm font-bold text-gray-900 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white transition-colors"
-                                style={{ resize: 'vertical', minHeight: item.nameBoxHeight ? `${item.nameBoxHeight}px` : '60px', minWidth: '100px' }}
+                                style={{
+                                  resize: 'both',
+                                  width: item.nameBoxWidth ? `${item.nameBoxWidth}px` : '100%',
+                                  minHeight: item.nameBoxHeight ? `${item.nameBoxHeight}px` : '60px',
+                                  minWidth: '100px'
+                                }}
                                 value={item.name}
                                 onChange={e => handleItemChange(item.id, 'name', e.target.value)}
                                 onBlur={e => {
+                                  const newWidth = e.target.offsetWidth;
                                   const newHeight = e.target.offsetHeight;
+                                  if (newWidth > 100 && newWidth !== item.nameBoxWidth) {
+                                    handleItemChange(item.id, 'nameBoxWidth', newWidth);
+                                  }
                                   if (newHeight > 60 && newHeight !== item.nameBoxHeight) {
                                     handleItemChange(item.id, 'nameBoxHeight', newHeight);
                                   }
@@ -1800,17 +1816,29 @@ ${formData.companyContact || '張惟荏'}
                           <td className="px-2 py-2 align-top">
                             {isPrintMode ? (
                               <div
-                                className="w-full text-xs text-gray-600 whitespace-pre-wrap"
-                                style={item.specBoxHeight ? { minHeight: `${item.specBoxHeight}px` } : {}}
+                                className="text-xs text-gray-600 whitespace-pre-wrap"
+                                style={{
+                                  ...(item.specBoxWidth ? { width: `${item.specBoxWidth}px` } : {}),
+                                  ...(item.specBoxHeight ? { minHeight: `${item.specBoxHeight}px` } : {})
+                                }}
                               >{item.spec}</div>
                             ) : (
                               <textarea
                                 className="w-full border border-gray-200 rounded p-2 text-xs text-gray-600 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white transition-colors placeholder-gray-300"
-                                style={{ resize: 'vertical', minHeight: item.specBoxHeight ? `${item.specBoxHeight}px` : '60px', minWidth: '100px' }}
+                                style={{
+                                  resize: 'both',
+                                  width: item.specBoxWidth ? `${item.specBoxWidth}px` : '100%',
+                                  minHeight: item.specBoxHeight ? `${item.specBoxHeight}px` : '60px',
+                                  minWidth: '100px'
+                                }}
                                 value={item.spec}
                                 onChange={e => handleItemChange(item.id, 'spec', e.target.value)}
                                 onBlur={e => {
+                                  const newWidth = e.target.offsetWidth;
                                   const newHeight = e.target.offsetHeight;
+                                  if (newWidth > 100 && newWidth !== item.specBoxWidth) {
+                                    handleItemChange(item.id, 'specBoxWidth', newWidth);
+                                  }
                                   if (newHeight > 60 && newHeight !== item.specBoxHeight) {
                                     handleItemChange(item.id, 'specBoxHeight', newHeight);
                                   }
