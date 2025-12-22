@@ -1777,19 +1777,19 @@ ${formData.companyContact || '張惟荏'}
                           <td className="px-2 py-2 text-xs text-gray-500 align-top pt-3">{idx + 1}</td>
                           <td className="px-2 py-2 align-top">
                             {isPrintMode ? (
-                              <div 
+                              <div
                                 className="w-full text-sm font-bold text-gray-900 whitespace-pre-wrap"
                                 style={item.nameBoxHeight ? { minHeight: `${item.nameBoxHeight}px` } : {}}
                               >{item.name}</div>
                             ) : (
                               <textarea
                                 className="w-full border border-gray-200 rounded p-2 text-sm font-bold text-gray-900 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white transition-colors"
-                                style={{ resize: 'both', minHeight: item.nameBoxHeight ? `${item.nameBoxHeight}px` : '60px', minWidth: '100px' }}
+                                style={{ resize: 'vertical', minHeight: item.nameBoxHeight ? `${item.nameBoxHeight}px` : '60px', minWidth: '100px' }}
                                 value={item.name}
                                 onChange={e => handleItemChange(item.id, 'name', e.target.value)}
-                                onMouseUp={e => {
+                                onBlur={e => {
                                   const newHeight = e.target.offsetHeight;
-                                  if (newHeight !== item.nameBoxHeight) {
+                                  if (newHeight > 60 && newHeight !== item.nameBoxHeight) {
                                     handleItemChange(item.id, 'nameBoxHeight', newHeight);
                                   }
                                 }}
@@ -1799,19 +1799,19 @@ ${formData.companyContact || '張惟荏'}
                           </td>
                           <td className="px-2 py-2 align-top">
                             {isPrintMode ? (
-                              <div 
+                              <div
                                 className="w-full text-xs text-gray-600 whitespace-pre-wrap"
                                 style={item.specBoxHeight ? { minHeight: `${item.specBoxHeight}px` } : {}}
                               >{item.spec}</div>
                             ) : (
                               <textarea
                                 className="w-full border border-gray-200 rounded p-2 text-xs text-gray-600 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white transition-colors placeholder-gray-300"
-                                style={{ resize: 'both', minHeight: item.specBoxHeight ? `${item.specBoxHeight}px` : '60px', minWidth: '100px' }}
+                                style={{ resize: 'vertical', minHeight: item.specBoxHeight ? `${item.specBoxHeight}px` : '60px', minWidth: '100px' }}
                                 value={item.spec}
                                 onChange={e => handleItemChange(item.id, 'spec', e.target.value)}
-                                onMouseUp={e => {
+                                onBlur={e => {
                                   const newHeight = e.target.offsetHeight;
-                                  if (newHeight !== item.specBoxHeight) {
+                                  if (newHeight > 60 && newHeight !== item.specBoxHeight) {
                                     handleItemChange(item.id, 'specBoxHeight', newHeight);
                                   }
                                 }}
