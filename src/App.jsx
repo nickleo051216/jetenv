@@ -903,12 +903,12 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     // 表格欄位寬度設定 (百分比)
     columnWidths: {
       name: 18,    // 項目名稱
-      spec: 35,    // 規格描述
-      frequency: 8, // 頻率
-      unit: 7,     // 單位
-      qty: 8,      // 數量
-      price: 10,   // 單價
-      total: 12    // 複價
+      spec: 42,    // 規格描述 (加大)
+      frequency: 5, // 頻率
+      unit: 5,     // 單位
+      qty: 5,      // 數量
+      price: 8,    // 單價
+      total: 10    // 複價
     }
   });
 
@@ -1774,60 +1774,154 @@ ${formData.companyContact || '張惟荏'}
                   <table className="w-full divide-y divide-gray-300 border-t border-b border-gray-300" style={{ tableLayout: 'fixed' }}>
                     <thead className="bg-teal-50">
                       <tr>
-                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800" style={{ width: '40px' }}>No.</th>
+                        <th className="px-2 py-2 text-left text-xs font-bold text-teal-800" style={{ width: '30px' }}>No.</th>
+                        {/* 項目名稱 */}
                         <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 relative" style={{ width: `${formData.columnWidths?.name || 18}%` }}>
                           項目名稱
                           {!isPrintMode && (
-                            <div
-                              className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-teal-300 transition-colors"
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-teal-200 hover:bg-teal-400 transition-colors"
                               onMouseDown={(e) => {
                                 e.preventDefault();
                                 const startX = e.clientX;
                                 const startWidth = formData.columnWidths?.name || 18;
+                                const tableWidth = e.target.closest('table').offsetWidth;
                                 const onMouseMove = (moveE) => {
-                                  const diff = ((moveE.clientX - startX) / e.target.closest('table').offsetWidth) * 100;
-                                  const newWidth = Math.max(10, Math.min(40, startWidth + diff));
-                                  setFormData(prev => ({ ...prev, columnWidths: { ...prev.columnWidths, name: Math.round(newWidth) } }));
+                                  const diff = ((moveE.clientX - startX) / tableWidth) * 100;
+                                  setFormData(prev => ({ ...prev, columnWidths: { ...prev.columnWidths, name: Math.max(8, Math.min(35, Math.round(startWidth + diff))) } }));
                                 };
-                                const onMouseUp = () => {
-                                  document.removeEventListener('mousemove', onMouseMove);
-                                  document.removeEventListener('mouseup', onMouseUp);
-                                };
+                                const onMouseUp = () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); };
                                 document.addEventListener('mousemove', onMouseMove);
                                 document.addEventListener('mouseup', onMouseUp);
                               }}
                             />
                           )}
                         </th>
+                        {/* 規格描述 */}
                         <th className="px-2 py-2 text-left text-xs font-bold text-teal-800 relative" style={{ width: `${formData.columnWidths?.spec || 35}%` }}>
                           規格描述 / 備註
                           {!isPrintMode && (
-                            <div
-                              className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-teal-300 transition-colors"
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-teal-200 hover:bg-teal-400 transition-colors"
                               onMouseDown={(e) => {
                                 e.preventDefault();
                                 const startX = e.clientX;
                                 const startWidth = formData.columnWidths?.spec || 35;
+                                const tableWidth = e.target.closest('table').offsetWidth;
                                 const onMouseMove = (moveE) => {
-                                  const diff = ((moveE.clientX - startX) / e.target.closest('table').offsetWidth) * 100;
-                                  const newWidth = Math.max(15, Math.min(50, startWidth + diff));
-                                  setFormData(prev => ({ ...prev, columnWidths: { ...prev.columnWidths, spec: Math.round(newWidth) } }));
+                                  const diff = ((moveE.clientX - startX) / tableWidth) * 100;
+                                  setFormData(prev => ({ ...prev, columnWidths: { ...prev.columnWidths, spec: Math.max(15, Math.min(55, Math.round(startWidth + diff))) } }));
                                 };
-                                const onMouseUp = () => {
-                                  document.removeEventListener('mousemove', onMouseMove);
-                                  document.removeEventListener('mouseup', onMouseUp);
-                                };
+                                const onMouseUp = () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); };
                                 document.addEventListener('mousemove', onMouseMove);
                                 document.addEventListener('mouseup', onMouseUp);
                               }}
                             />
                           )}
                         </th>
-                        <th className="px-2 py-2 text-center text-xs font-bold text-teal-800" style={{ width: '60px' }}>頻率</th>
-                        <th className="px-2 py-2 text-center text-xs font-bold text-teal-800" style={{ width: '50px' }}>單位</th>
-                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800" style={{ width: '60px' }}>數量</th>
-                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800" style={{ width: '80px' }}>單價</th>
-                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800" style={{ width: '100px' }}>複價(NT$)</th>
+                        {/* 頻率 */}
+                        <th className="px-2 py-2 text-center text-xs font-bold text-teal-800 relative" style={{ width: `${formData.columnWidths?.frequency || 6}%` }}>
+                          頻率
+                          {!isPrintMode && (
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-teal-200 hover:bg-teal-400 transition-colors"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const startX = e.clientX;
+                                const startWidth = formData.columnWidths?.frequency || 6;
+                                const tableWidth = e.target.closest('table').offsetWidth;
+                                const onMouseMove = (moveE) => {
+                                  const diff = ((moveE.clientX - startX) / tableWidth) * 100;
+                                  setFormData(prev => ({ ...prev, columnWidths: { ...prev.columnWidths, frequency: Math.max(4, Math.min(12, Math.round(startWidth + diff))) } }));
+                                };
+                                const onMouseUp = () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); };
+                                document.addEventListener('mousemove', onMouseMove);
+                                document.addEventListener('mouseup', onMouseUp);
+                              }}
+                            />
+                          )}
+                        </th>
+                        {/* 單位 */}
+                        <th className="px-2 py-2 text-center text-xs font-bold text-teal-800 relative" style={{ width: `${formData.columnWidths?.unit || 5}%` }}>
+                          單位
+                          {!isPrintMode && (
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-teal-200 hover:bg-teal-400 transition-colors"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const startX = e.clientX;
+                                const startWidth = formData.columnWidths?.unit || 5;
+                                const tableWidth = e.target.closest('table').offsetWidth;
+                                const onMouseMove = (moveE) => {
+                                  const diff = ((moveE.clientX - startX) / tableWidth) * 100;
+                                  setFormData(prev => ({ ...prev, columnWidths: { ...prev.columnWidths, unit: Math.max(3, Math.min(10, Math.round(startWidth + diff))) } }));
+                                };
+                                const onMouseUp = () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); };
+                                document.addEventListener('mousemove', onMouseMove);
+                                document.addEventListener('mouseup', onMouseUp);
+                              }}
+                            />
+                          )}
+                        </th>
+                        {/* 數量 */}
+                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 relative" style={{ width: `${formData.columnWidths?.qty || 6}%` }}>
+                          數量
+                          {!isPrintMode && (
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-teal-200 hover:bg-teal-400 transition-colors"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const startX = e.clientX;
+                                const startWidth = formData.columnWidths?.qty || 6;
+                                const tableWidth = e.target.closest('table').offsetWidth;
+                                const onMouseMove = (moveE) => {
+                                  const diff = ((moveE.clientX - startX) / tableWidth) * 100;
+                                  setFormData(prev => ({ ...prev, columnWidths: { ...prev.columnWidths, qty: Math.max(4, Math.min(12, Math.round(startWidth + diff))) } }));
+                                };
+                                const onMouseUp = () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); };
+                                document.addEventListener('mousemove', onMouseMove);
+                                document.addEventListener('mouseup', onMouseUp);
+                              }}
+                            />
+                          )}
+                        </th>
+                        {/* 單價 */}
+                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 relative" style={{ width: `${formData.columnWidths?.price || 8}%` }}>
+                          單價
+                          {!isPrintMode && (
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-teal-200 hover:bg-teal-400 transition-colors"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const startX = e.clientX;
+                                const startWidth = formData.columnWidths?.price || 8;
+                                const tableWidth = e.target.closest('table').offsetWidth;
+                                const onMouseMove = (moveE) => {
+                                  const diff = ((moveE.clientX - startX) / tableWidth) * 100;
+                                  setFormData(prev => ({ ...prev, columnWidths: { ...prev.columnWidths, price: Math.max(5, Math.min(15, Math.round(startWidth + diff))) } }));
+                                };
+                                const onMouseUp = () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); };
+                                document.addEventListener('mousemove', onMouseMove);
+                                document.addEventListener('mouseup', onMouseUp);
+                              }}
+                            />
+                          )}
+                        </th>
+                        {/* 複價 */}
+                        <th className="px-2 py-2 text-right text-xs font-bold text-teal-800 relative" style={{ width: `${formData.columnWidths?.total || 10}%` }}>
+                          複價(NT$)
+                          {!isPrintMode && (
+                            <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-teal-200 hover:bg-teal-400 transition-colors"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const startX = e.clientX;
+                                const startWidth = formData.columnWidths?.total || 10;
+                                const tableWidth = e.target.closest('table').offsetWidth;
+                                const onMouseMove = (moveE) => {
+                                  const diff = ((moveE.clientX - startX) / tableWidth) * 100;
+                                  setFormData(prev => ({ ...prev, columnWidths: { ...prev.columnWidths, total: Math.max(6, Math.min(18, Math.round(startWidth + diff))) } }));
+                                };
+                                const onMouseUp = () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); };
+                                document.addEventListener('mousemove', onMouseMove);
+                                document.addEventListener('mouseup', onMouseUp);
+                              }}
+                            />
+                          )}
+                        </th>
                         {!isPrintMode && <th className="px-2 py-2 w-8"></th>}
                       </tr>
                     </thead>
