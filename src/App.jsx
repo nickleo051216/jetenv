@@ -962,10 +962,14 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
       price: product.price || 0,
       qty: 1,
       frequency: '',
-      note: ''
+      note: '',
+      nameBoxHeight: null,  // 項目名稱欄位高度 (null = 自動)
+      specBoxHeight: null   // 規格描述欄位高度 (null = 自動)
     } : {
       id: Date.now(),
-      name: '', spec: '', unit: '式', price: 0, qty: 1, frequency: '', note: ''
+      name: '', spec: '', unit: '式', price: 0, qty: 1, frequency: '', note: '',
+      nameBoxHeight: null,
+      specBoxHeight: null
     };
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
   };
@@ -1773,26 +1777,44 @@ ${formData.companyContact || '張惟荏'}
                           <td className="px-2 py-2 text-xs text-gray-500 align-top pt-3">{idx + 1}</td>
                           <td className="px-2 py-2 align-top">
                             {isPrintMode ? (
-                              <div className="w-full text-sm font-bold text-gray-900 whitespace-pre-wrap">{item.name}</div>
+                              <div 
+                                className="w-full text-sm font-bold text-gray-900 whitespace-pre-wrap"
+                                style={item.nameBoxHeight ? { minHeight: `${item.nameBoxHeight}px` } : {}}
+                              >{item.name}</div>
                             ) : (
                               <textarea
                                 className="w-full border border-gray-200 rounded p-2 text-sm font-bold text-gray-900 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white transition-colors"
-                                style={{ resize: 'both', minHeight: '60px', minWidth: '100px' }}
+                                style={{ resize: 'both', minHeight: item.nameBoxHeight ? `${item.nameBoxHeight}px` : '60px', minWidth: '100px' }}
                                 value={item.name}
                                 onChange={e => handleItemChange(item.id, 'name', e.target.value)}
+                                onMouseUp={e => {
+                                  const newHeight = e.target.offsetHeight;
+                                  if (newHeight !== item.nameBoxHeight) {
+                                    handleItemChange(item.id, 'nameBoxHeight', newHeight);
+                                  }
+                                }}
                                 placeholder="輸入項目名稱..."
                               />
                             )}
                           </td>
                           <td className="px-2 py-2 align-top">
                             {isPrintMode ? (
-                              <div className="w-full text-xs text-gray-600 whitespace-pre-wrap">{item.spec}</div>
+                              <div 
+                                className="w-full text-xs text-gray-600 whitespace-pre-wrap"
+                                style={item.specBoxHeight ? { minHeight: `${item.specBoxHeight}px` } : {}}
+                              >{item.spec}</div>
                             ) : (
                               <textarea
                                 className="w-full border border-gray-200 rounded p-2 text-xs text-gray-600 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-gray-50 hover:bg-white transition-colors placeholder-gray-300"
-                                style={{ resize: 'both', minHeight: '60px', minWidth: '100px' }}
+                                style={{ resize: 'both', minHeight: item.specBoxHeight ? `${item.specBoxHeight}px` : '60px', minWidth: '100px' }}
                                 value={item.spec}
                                 onChange={e => handleItemChange(item.id, 'spec', e.target.value)}
+                                onMouseUp={e => {
+                                  const newHeight = e.target.offsetHeight;
+                                  if (newHeight !== item.specBoxHeight) {
+                                    handleItemChange(item.id, 'specBoxHeight', newHeight);
+                                  }
+                                }}
                                 placeholder="輸入規格描述或備註..."
                               />
                             )}

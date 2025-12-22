@@ -1,145 +1,142 @@
-# React + Vite
+# 傑太環境工程 系統索引
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-
-## System Architecture & Integrations
-
-### n8n Automation (Backend)
-
-The system relies on n8n workflows hosted at `jetenv.zeabur.app` for server-side operations:
-
-- **Base URL**: `https://jetenv.zeabur.app`
-- **Endpoints**:
-  - Company Lookup (MOEA): `/webhook/ipas-conpanynumber`
-  - Email Service: `/webhook/email`
-  - LINE Bot Integration: `/webhook/money`
+本文件記錄傑太環境工程內部使用的各系統代稱與對應資源。
 
 ---
 
-## n8n 報價系統工作流程
+## 📊 業務系統
 
-本系統透過 n8n 整合 LINE Bot、Google Firestore、AI Agent 等服務，提供完整的報價管理自動化流程。
+> **代稱**：當我說「業務系統」，就是指這個系統
 
-### 主要功能
+### 系統資訊
 
-#### 1. LINE Bot 客戶互動
+| 項目 | 說明 |
+|------|------|
+| **GitHub Repo** | [jetenv-sales-system](https://github.com/nickleo051216/jetenv-sales-system) |
+| **用途** | 環境保護許可管理系統 - 工廠資料管理與換證追蹤 |
+| **資料庫** | Supabase (`factories` 表) |
 
-**Webhook 觸發點**: `/webhook/money`
+### n8n 工作流程
 
-系統透過 LINE Messaging API 與客戶互動，支援以下功能：
+**觸發方式**：
+- 手動執行
+- 排程觸發（每週二、四 凌晨 3 點）
 
-| 功能 | 觸發條件 | 處理流程 |
-|------|---------|---------|
-| 🤖 **幫助指令** | 使用者傳送「嗨」 | 回傳功能選單與使用說明 |
-| 🔍 **查詢報價** | 訊息包含「查詢」 | AI Agent 查詢 Firestore 資料庫並回傳報價進度 |
-| ➕ **文字新增客戶** | 訊息包含「新增」 | AI 解析文字資訊並存入客戶資料庫 |
-| 📇 **名片識別新增** | 上傳圖片 | Gemini 2.5 Flash 識別名片內容並自動建檔 |
-| 📄 **報價單回簽上傳** | 上傳 PDF 檔案 | 驗證檔名格式、更新狀態、上傳至 Google Drive |
-| 💬 **AI 對話** | 一般文字訊息 | AI Agent 提供智慧回覆（含記憶功能） |
+**資料來源**：
+- Google Sheets：`環境保護許可管理系統` → `樹林區` 工作表
 
-#### 2. 客戶資料管理
-
-##### 名片自動識別流程
+**流程說明**：
 
 ```mermaid
 graph LR
-    A[使用者上傳圖片] --> B[LINE API 下載圖片]
-    B --> C[Gemini 2.5 Flash 分析]
-    C --> D[AI Agent 解析資料]
-    D --> E[格式化為 JSON]
-    E --> F[儲存至 Firestore]
-    F --> G[LINE 回覆確認訊息]
+    A[Schedule/Manual Trigger] --> B[讀取 Google Sheets<br>樹林區]
+    B --> C{篩選換證年<br>11412 < X < 11606}
+    C --> D[Loop Over Items]
+    D --> E[查詢統編是否存在]
+    E --> F{統編是否為空?}
+    F -->|是| G[新增到 Supabase]
+    F -->|否| H[跳過/繼續迴圈]
+    G --> D
 ```
 
-**儲存的客戶欄位**:
+**欄位對應**：
 
-- `name`: 公司名稱
-- `taxId`: 統一編號
-- `contact`: 聯絡人姓名
-- `phone`: 電話
-- `address`: 地址
-- `email`: 電子信箱
-- `fax`: 傳真
+| Supabase 欄位 | 資料來源 |
+|---------------|----------|
+| `emsno` | 環保署管理編號 |
+| `uniformno` | 統一編號 |
+| `facilityname` | 工廠名稱 |
+| `facilityaddress` | 工廠地址 |
+| `industryareaname` | 工業區名稱 |
+| `industryid` | 行業代碼 |
+| `industryname` | 行業名稱 |
+| `isair` | 是否有空污許可 |
+| `iswater` | 是否有水污許可 |
+| `iswaste` | 是否有廢棄物許可 |
+| `istoxic` | 是否有毒化物許可 |
+| `issoil` | 是否有土壤許可 |
+| `consultant_company` | 顧問公司 |
+| `phone` | 電話 |
+| `renewal_year` | 換證年 |
+| `notes` | 備註 |
+| `scheduled_date` | 預計排程 |
+| `result` | 結果 |
 
-**Firestore 路徑**: `artifacts/jietai-prod/public/data/customers`
+---
 
-#### 3. 報價單回簽處理
+## 💰 報價系統
 
-當客戶上傳回簽的報價單 PDF 時，系統會自動執行以下流程：
+> **代稱**：當我說「報價系統」，就是指這個系統
+
+### 系統資訊
+
+| 項目 | 說明 |
+|------|------|
+| **GitHub Repo** | [jetenv](https://github.com/nickleo051216/jetenv) |
+| **線上網址** | [jetenvmoney.zeabur.app](https://jetenvmoney.zeabur.app) |
+| **用途** | 報價單管理、客戶管理、LINE Bot 整合 |
+| **資料庫** | Firebase Cloud Firestore (`jetenv-a82bc`) |
+
+### n8n 工作流程
+
+#### 1️⃣ LINE Bot 主流程
+
+**Webhook 端點**：`/webhook/money`
+
+**功能分類** (Switch 節點)：
+
+| 觸發條件 | 功能 | 說明 |
+|----------|------|------|
+| 輸入「嗨」 | Help | 顯示使用說明 |
+| 包含「查詢」 | 查詢 | AI Agent 查詢 Firestore 報價單資料 |
+| 包含「新增」 | 文字新增 | 透過 AI 解析文字並新增客戶 |
+| 訊息類型 = `image` | 圖片名片新增 | Gemini 辨識名片圖片並新增客戶 |
+| 訊息類型 = `file` | 報價單回簽上傳 | 處理 PDF 回簽並歸檔 |
+| 其他文字 | AI | 一般 AI 對話 |
+
+**流程圖**：
 
 ```mermaid
 graph TD
-    A[上傳 PDF 檔案] --> B[解析檔名<br/>格式: J-YY-MMxxx]
-    B --> C{檔名格式正確?}
-    C -->|否| D[提示重新命名]
-    C -->|是| E[查詢 Firestore 報價單]
-    E --> F{找到對應報價?}
-    F -->|否| G[查無此報價單]
-    F -->|是| H[更新狀態為 ordered]
-    H --> I[下載 PDF 檔案]
-    I --> J[上傳至 Google Drive<br/>資料夾: 報價單回簽]
-    J --> K[回傳歸檔連結]
+    A[LINE Webhook] --> B[動畫 Loading]
+    A --> C{Switch 判斷訊息類型}
+    
+    C -->|嗨| D[顯示使用說明]
+    C -->|查詢| E[AI Agent + Firestore Tool]
+    C -->|新增| F[AI 解析文字 → JSON]
+    C -->|圖片| G[Gemini 辨識名片]
+    C -->|PDF 檔案| H[解析檔名取單號]
+    C -->|其他| I[AI 對話 + Memory]
+    
+    E --> J[LINE 回覆結果]
+    F --> K[新增客戶到 Firestore]
+    G --> L[Gemini 讀取] --> F
+    K --> M[LINE 回覆成功]
+    
+    H --> N[查詢 Firestore 報價單]
+    N --> O{報價單存在?}
+    O -->|是| P[更新狀態為 ordered]
+    O -->|否| Q[LINE 回覆查無此單]
+    P --> R[從 LINE 下載 PDF]
+    R --> S[上傳至 Google Drive]
+    S --> T[LINE 回覆歸檔成功]
+    
+    I --> U[LINE 回覆 AI 回應]
 ```
 
-**檔名規則**: `J-YY-MMxxx-客戶名-案件名.pdf`
+#### 2️⃣ 經濟部公司查詢 API
 
-- 範例: `J-25-12001-傑太環境-廢水處理.pdf`
+**Webhook 端點**：`GET /webhook/ipas-conpanynumber?taxId=統一編號`
 
-**Google Drive 資料夾 ID**: `1iGn4RDEqyfKKIjg19Y0CTzfXAMzOTYSC`
+**功能**：透過統一編號查詢公司基本資料與營業項目
 
-#### 4. 智慧查詢功能
+**流程**：
+1. 檢查 `taxId` 參數是否存在
+2. 呼叫經濟部 GCIS API 查詢公司基本資料
+3. 呼叫經濟部 GCIS API 查詢營業項目
+4. 格式化並回傳 JSON
 
-使用者可透過自然語言查詢報價進度，AI Agent 會自動：
-
-1. 連接 Firestore 資料庫（`artifacts/jietai-prod/public/data/quotations`）
-2. 根據關鍵字搜尋報價單
-3. 整理並回傳查詢結果
-
-#### 5. AI Agent 配置
-
-系統使用三個 AI Agent，各自負責不同任務：
-
-| Agent | 模型 | 用途 | 特殊功能 |
-|-------|------|------|---------|
-| AI Agent | OpenRouter | 報價資料查詢 | 連接 Firestore Tool |
-| AI Agent1 | OpenRouter | 客戶資料解析 | JSON 格式化輸出 |
-| AI Agent2 | OpenRouter | 一般對話 | Session Memory |
-
-**記憶功能**: AI Agent2 使用 `memoryBufferWindow` 保存對話歷史，以 LINE userId 作為 session key。
-
-### Webhook 端點說明
-
-#### 公司基本資料查詢 API
-
-**端點**: `POST /webhook/ipas-conpanynumber`
-
-**用途**: 查詢台灣公司登記資料（經濟部商工登記公示資料）
-
-**參數**:
-
-```json
-{
-  "query": {
-    "taxId": "統一編號"
-  }
-}
-```
-
-**回傳**:
-
+**回傳格式**：
 ```json
 {
   "found": true,
@@ -147,103 +144,50 @@ graph TD
     "taxId": "統一編號",
     "name": "公司名稱",
     "status": "公司狀態",
-    "representative": "負責人",
-    "address": "公司地址",
+    "representative": "代表人",
+    "address": "地址",
     "capital": "資本額",
     "industryStats": ["營業項目1", "營業項目2"]
   }
 }
 ```
 
-**資料來源**:
+#### 3️⃣ 一鍵寄出報價單
 
-- 公司基本資料: `data.gcis.nat.gov.tw` API `5F64D864-61CB-4D0D-8AD9-492047CC1EA6`
-- 營業項目: `data.gcis.nat.gov.tw` API `426D5542-71FC-4547-9C54-30BDFE20C2CA`
+**Webhook 端點**：`POST /webhook/email`
 
-#### 報價單寄送 API
+**功能**：將報價單 HTML 轉為 PDF 並寄送 Email
 
-**端點**: `POST /webhook/email`
-
-**用途**: 將報價單 HTML 轉換為 PDF 並寄送給客戶
-
-**參數**:
-
+**Request Body**：
 ```json
 {
-  "body": {
-    "to": "客戶信箱",
-    "subject": "信件主旨",
-    "quoteHtml": "報價單 HTML 內容",
-    "quoteNumber": "報價單號",
-    "clientContact": "客戶聯絡人",
-    "grandTotal": "總金額"
-  }
+  "to": "收件人 Email",
+  "subject": "郵件主旨",
+  "clientContact": "客戶聯絡人",
+  "quoteNumber": "報價單編號",
+  "grandTotal": "總金額",
+  "quoteHtml": "報價單 HTML 內容"
 }
 ```
 
-**處理流程**:
+---
 
-1. HTML to PDF 轉換（使用 `htmlcsstopdf` 服務）
-2. SMTP 寄出郵件（從 `jetenv02@gmail.com`）
-3. 附加 PDF 報價單檔案
-4. 回傳狀態碼 200
+## 🔧 相關服務
 
-**郵件範本**:
+| 服務 | 用途 |
+|------|------|
+| **n8n** | 工作流程自動化 |
+| **Supabase** | 業務系統資料庫 |
+| **Firebase Firestore** | 報價系統資料庫 |
+| **Google Sheets** | 環保許可資料來源 |
+| **Google Drive** | 報價單回簽歸檔 |
+| **LINE Messaging API** | Bot 訊息收發 |
+| **OpenRouter** | AI 語言模型 |
+| **Google Gemini** | 圖片辨識 |
+| **GCIS API** | 經濟部公司資料查詢 |
 
-```text
-{客戶聯絡人} 您好，
+---
 
-感謝您對傑太環境工程的信任與支持！
+## 📝 更新記錄
 
-附件為「專案」之報價單（單號：{報價單號}），
-報價總金額為 NT$ {總金額} 元（含稅）。
-
-報價單如附件，
-如有任何問題或需要調整，歡迎隨時與我們聯繫。
-
-若報價內容無誤，請於報價單簽名處簽章後回傳，
-我們將盡速安排後續作業。
-
-祝 商祺
-
-張惟荏
-傑太環境工程顧問有限公司
-電話：02-6609-5888 #103
-網站：https://www.jetenv.com.tw/
-```
-
-### LINE Bot 設定
-
-**LINE Channel**: 報價系統小幫手  
-**Webhook URL**: `https://jetenv.zeabur.app/webhook/money`
-
-**支援的訊息類型**:
-
-- `text`: 文字訊息
-- `image`: 圖片（名片識別）
-- `file`: 檔案（報價單回簽）
-
-**功能選單**:
-
-```text
-您好 我是傑太報價系統小幫手
-有什麼可以幫您？
-1. 查詢報價進度
-(請先輸入 查詢 再輸入您要找的資料)
-2. 新增客戶
-(直接輸入文字 or 圖片檔名片)
-3. 報價單簽回回傳歸檔
-(請直接上傳 PDF 檔案 並以 J-XX-XXxxx 命名)
-```
-
-### 技術整合
-
-| 服務 | 用途 | 憑證 |
-|------|------|------|
-| Google Firestore | 資料庫儲存 | Service Account |
-| LINE Messaging API | 聊天機器人 | Channel Access Token |
-| Google Gemini | 圖片識別 | API Key |
-| OpenRouter | AI 對話 | API Key |
-| Google Drive | 檔案歸檔 | OAuth2 |
-| SMTP (Gmail) | 郵件寄送 | App Password |
-| HTML to PDF | PDF 轉換 | API Key |
+- **2025-12-15**：建立本文件，記錄業務系統與報價系統資訊
