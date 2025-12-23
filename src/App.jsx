@@ -1286,9 +1286,21 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
       display: flex; 
       justify-content: space-between; 
       margin-top: 32px; 
-      gap: 32px;
+      gap: 24px;
     }
     .notes-section { flex: 1; }
+    .summary-right { 
+      flex: 1; 
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .bank-box {
+      background: #f0fdfa;
+      padding: 16px;
+      border-radius: 8px;
+      border-left: 4px solid #0d9488;
+    }
     .notes-title { 
       font-size: 11px; 
       font-weight: 700; 
@@ -1463,7 +1475,9 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           <div class="notes-title">付款期限</div>
           <div class="notes-content">${formData.paymentTerms || '-'}</div>
         </div>
-        <div class="notes-block" style="margin-top: 16px;">
+      </div>
+      <div class="summary-right">
+        <div class="bank-box">
           <div class="notes-title">銀行帳號 Bank Account</div>
           <div class="notes-content">
             <div>戶名：傑太環境工程顧問有限公司</div>
@@ -1471,7 +1485,6 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
             <div>帳號：5377 717 318387</div>
           </div>
         </div>
-      </div>
       <div class="totals-box">
         <div class="total-row">
           <span>合計 (Subtotal)</span>
@@ -2067,10 +2080,9 @@ ${formData.companyContact || '張惟荏'}
                       <SmartSelect label="付款方式 Payment Method" options={PAYMENT_METHODS} value={formData.paymentMethod} onChange={(val) => setFormData({ ...formData, paymentMethod: val })} isPrintMode={isPrintMode} />
                       <SmartSelect label="付款期限 Payment Terms" options={PAYMENT_TERMS} value={formData.paymentTerms} onChange={(val) => setFormData({ ...formData, paymentTerms: val })} isPrintMode={isPrintMode} />
                       <NoteSelector value={formData.notes} onChange={(val) => setFormData({ ...formData, notes: val })} isPrintMode={isPrintMode} />
-                    </div>
-                    <div className="w-full md:flex-1 flex flex-col md:flex-row gap-4">
+
                       {/* 銀行帳號 */}
-                      <div className="flex-1 bg-teal-50 p-4 rounded-lg border-l-4 border-teal-500">
+                      <div className="bg-teal-50 p-4 rounded-lg border-l-4 border-teal-500 mt-4">
                         <div className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">銀行帳號 Bank Account</div>
                         <div className="space-y-1 text-sm text-gray-700">
                           <div><span className="text-gray-500">戶名：</span>傑太環境工程顧問有限公司</div>
@@ -2078,9 +2090,9 @@ ${formData.companyContact || '張惟荏'}
                           <div><span className="text-gray-500">帳號：</span><span className="font-mono font-semibold tracking-wider">5377 717 318387</span></div>
                         </div>
                       </div>
-
-                      {/* 總計 */}
-                      <div className="flex-1 bg-gray-50 p-6 rounded-lg space-y-3 border border-gray-200">
+                    </div>
+                    <div className="w-full md:w-80">
+                      <div className="bg-gray-50 p-6 rounded-lg space-y-3 border border-gray-200">
                         <div className="flex justify-between text-sm text-gray-600"><span>合計 (Subtotal)</span><span className="font-mono">NT$ {subtotal.toLocaleString()}</span></div>
                         <div className="flex justify-between text-sm text-gray-600"><span>營業稅 (Tax 5%)</span><span className="font-mono">NT$ {tax.toLocaleString()}</span></div>
                         <div className="border-t border-gray-300 my-2"></div>
