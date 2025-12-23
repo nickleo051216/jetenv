@@ -247,6 +247,7 @@ export default function App() {
                   { id: 'dashboard', label: '報價管理', icon: FileText },
                   { id: 'customers', label: '客戶通訊錄', icon: Users },
                   { id: 'products', label: '產品/服務庫', icon: Package },
+                  { id: 'notes', label: '備註管理', icon: StickyNote },
                 ].map(item => (
                   <button
                     key={item.id}
@@ -277,6 +278,7 @@ export default function App() {
         )}
         {view === 'customers' && <CustomerManager />}
         {view === 'products' && <ProductManager />}
+        {view === 'notes' && <NoteManager />}
         {view === 'editor' && (
           <QuoteEditor
             user={user}
@@ -2065,6 +2067,16 @@ ${formData.companyContact || '張惟荏'}
                       <SmartSelect label="付款方式 Payment Method" options={PAYMENT_METHODS} value={formData.paymentMethod} onChange={(val) => setFormData({ ...formData, paymentMethod: val })} isPrintMode={isPrintMode} />
                       <SmartSelect label="付款期限 Payment Terms" options={PAYMENT_TERMS} value={formData.paymentTerms} onChange={(val) => setFormData({ ...formData, paymentTerms: val })} isPrintMode={isPrintMode} />
                       <NoteSelector value={formData.notes} onChange={(val) => setFormData({ ...formData, notes: val })} isPrintMode={isPrintMode} />
+
+                      {/* 銀行帳號 */}
+                      <div className="bg-teal-50 p-4 rounded-lg border-l-4 border-teal-500 mt-4">
+                        <div className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">銀行帳號 Bank Account</div>
+                        <div className="space-y-1 text-sm text-gray-700">
+                          <div><span className="text-gray-500">戶名：</span>傑太環境工程顧問有限公司</div>
+                          <div><span className="text-gray-500">銀行：</span>玉山銀行 - 土城分行</div>
+                          <div><span className="text-gray-500">帳號：</span><span className="font-mono font-semibold tracking-wider">5377 717 318387</span></div>
+                        </div>
+                      </div>
                     </div>
                     <div className="w-full md:w-80">
                       <div className="bg-gray-50 p-6 rounded-lg space-y-3 border border-gray-200">
