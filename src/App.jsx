@@ -1216,7 +1216,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     .company-details p { margin: 4px 0; }
     
     /* Quote Info */
-    .quote-info { text-align: right; min-width: 240px; }
+    .quote-info { text-align: right; min-width: 320px; }
     .quote-info-row { 
       display: flex; 
       justify-content: space-between; 
@@ -1342,10 +1342,10 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     }
     .stamp-img {
       position: absolute;
-      bottom: 5px;
+      bottom: 2px;
       left: 50%;
       transform: translateX(-50%);
-      width: 100px;
+      width: 140px;
       height: auto;
       opacity: 0.9;
     }
@@ -1460,6 +1460,14 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         <div class="notes-block">
           <div class="notes-title">付款期限</div>
           <div class="notes-content">${formData.paymentTerms || '-'}</div>
+        </div>
+        <div class="notes-block" style="margin-top: 16px;">
+          <div class="notes-title">銀行帳號 Bank Account</div>
+          <div class="notes-content">
+            <div>戶名：傑太環境工程顧問有限公司</div>
+            <div>銀行：玉山銀行 - 土城分行</div>
+            <div>帳號：5377 717 318387</div>
+          </div>
         </div>
       </div>
       <div class="totals-box">
