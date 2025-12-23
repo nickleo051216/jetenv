@@ -1281,44 +1281,36 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     th.center { text-align: center; }
     th.right { text-align: right; }
     
-    /* Summary */
+    /* Summary - 使用 Table Layout 確保 PDF 渲染正常 */
     .summary { 
-      display: flex; 
-      justify-content: space-between; 
+      display: table; 
+      width: 100%; 
+      border-spacing: 0;
       margin-top: 32px; 
-      gap: 24px;
     }
-    .notes-section { flex: 1; }
+    .notes-section { 
+      display: table-cell;
+      width: 60%;
+      vertical-align: top;
+      padding-right: 24px;
+    }
     .summary-right { 
-      flex: 1; 
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
+      display: table-cell;
+      width: 40%; 
+      vertical-align: top;
     }
     .bank-box {
       background: #f0fdfa;
       padding: 16px;
       border-radius: 8px;
       border-left: 4px solid #0d9488;
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 16px;
     }
-    .notes-title { 
-      font-size: 11px; 
-      font-weight: 700; 
-      color: #6b7280; 
-      text-transform: uppercase;
-      margin-bottom: 8px; 
-    }
-    .notes-content { 
-      font-size: 12px; 
-      color: #374151; 
-      white-space: pre-wrap; 
-      line-height: 1.7; 
-    }
-    .notes-block { margin-bottom: 16px; }
-    
-    /* Totals */
     .totals-box { 
-      width: 280px; 
+      width: 100%;
+      box-sizing: border-box; 
       background: #f9fafb; 
       padding: 20px; 
       border-radius: 8px; 
@@ -1382,8 +1374,28 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     }
   </style>
 </head>
+</head>
 <body>
-  <div class="container">
+  <!-- Wrapping Table for Repeating Headers -->
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <td>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #f0fdfa; border-bottom: 2px solid #0d9488; margin-bottom: 16px; font-size: 11px;">
+             <div style="font-weight: bold; color: #134e4a;">傑太環境工程顧問有限公司</div>
+             <div style="display: flex; gap: 16px; align-items: center;">
+               <span>報價單號：<span style="font-weight: bold; color: #0d9488;">${formData.quoteNumber}</span></span>
+               <span style="color: #4b5563;">${formData.date}</span>
+               <span style="background: #0d9488; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold;">NT$ ${grandTotal.toLocaleString()}</span>
+             </div>
+          </div>
+        </td>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+  <div class="container" style="border: none; max-width: none; padding: 0;">
     <div class="header">
       <div class="company-info">
         <h1>報 價 單</h1>
@@ -1461,31 +1473,31 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
       </tbody>
     </table>
 
-    <div class="summary">
-      <div class="notes-section">
-        <div class="notes-block">
-          <div class="notes-title">備註 Notes</div>
-          <div class="notes-content">${formData.notes || '-'}</div>
-        </div>
-        <div class="notes-block">
-          <div class="notes-title">付款方式</div>
-          <div class="notes-content">${formData.paymentMethod || '-'}</div>
-        </div>
-        <div class="notes-block">
-          <div class="notes-title">付款期限</div>
-          <div class="notes-content">${formData.paymentTerms || '-'}</div>
-        </div>
-      </div>
-      <div class="summary-right">
-        <div class="bank-box">
-          <div class="notes-title">銀行帳號 Bank Account</div>
-          <div class="notes-content">
-            <div>戶名：傑太環境工程顧問有限公司</div>
-            <div>銀行：合作金庫 (006) 北土城分行</div>
-            <div>帳號：5377 717 318387</div>
+      <div class="summary">
+        <div class="notes-section">
+          <div class="notes-block">
+            <div class="notes-title">備註 Notes</div>
+            <div class="notes-content">${formData.notes || '-'}</div>
+          </div>
+          <div class="notes-block">
+            <div class="notes-title">付款方式</div>
+            <div class="notes-content">${formData.paymentMethod || '-'}</div>
+          </div>
+          <div class="notes-block">
+            <div class="notes-title">付款期限</div>
+            <div class="notes-content">${formData.paymentTerms || '-'}</div>
           </div>
         </div>
-      <div class="totals-box">
+        <div class="summary-right">
+          <div class="bank-box">
+            <div class="notes-title">銀行帳號 Bank Account</div>
+            <div class="notes-content">
+              <div>戶名：傑太環境工程顧問有限公司</div>
+              <div>銀行：合作金庫 (006) 北土城分行</div>
+              <div>帳號：5377 717 318387</div>
+            </div>
+          </div>
+          <div class="totals-box">
         <div class="total-row">
           <span>合計 (Subtotal)</span>
           <span>NT$ ${subtotal.toLocaleString()}</span>
@@ -1494,13 +1506,14 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           <span>營業稅 (Tax 5%)</span>
           <span>NT$ ${tax.toLocaleString()}</span>
         </div>
-        <div class="total-row grand">
-          <span>總計 (Total)</span>
-          <span>NT$ ${grandTotal.toLocaleString()}</span>
+            <div class="total-row grand">
+              <span>總計 (Total)</span>
+              <span>NT$ ${grandTotal.toLocaleString()}</span>
+            </div>
+            <div class="currency-note">幣別：新台幣 (TWD)</div>
+          </div>
         </div>
-        <div class="currency-note">幣別：新台幣 (TWD)</div>
       </div>
-    </div>
 
     <div class="signatures">
       <div class="signature-box">
@@ -1516,9 +1529,13 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     </div>
 
     <div class="footer">
-      <a href="https://www.jetenv.com.tw/">https://www.jetenv.com.tw/</a> | 傑太環境工程顧問有限公司 | ${formData.quoteNumber}
+      <a href="https://www.jetenv.com.tw/">https://www.jetenv.com.tw/</a> | 傑太環境工程顧問有限公司 | ${formData.quoteNumber}      </div>
     </div>
   </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
 </body>
 </html>`;
   };
