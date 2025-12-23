@@ -1691,10 +1691,28 @@ ${formData.companyContact || '張惟荏'}
         )}
 
         <table className="w-full">
-          {/* THEAD: 這是會每頁重複出現的表頭 */}
-          <thead>
+          {/* THEAD: 極簡header - 只在打印時每頁重複 */}
+          <thead className="hidden print:table-header-group">
             <tr>
               <td>
+                <div className="flex items-center justify-between py-1 px-3 bg-teal-50 border-b-2 border-teal-600 mb-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <img src={logoPreview} alt="Logo" className="h-6 w-auto" onError={(e) => { e.target.style.display = 'none'; }} />
+                    <span className="font-bold text-teal-900">傑太環境工程顧問有限公司</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-gray-600">報價單號：<span className="font-bold text-teal-700">{formData.quoteNumber}</span></span>
+                    <span className="text-gray-600">{formData.date}</span>
+                    <span className="bg-teal-600 text-white px-2 py-0.5 rounded font-bold">NT$ {grandTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                {/* 完整header - 螢幕顯示+打印第一頁 */}
                 <div className="pb-6"> {/* 表頭內容 */}
                   <header className="flex justify-between items-start mb-4 border-b-2 border-teal-700 pb-4 relative">
                     <div className="flex gap-6">
@@ -1812,10 +1830,6 @@ ${formData.companyContact || '張惟荏'}
                 </div>
               </td>
             </tr>
-          </thead>
-
-          {/* TBODY: 報價內容 + 客戶資料 + 頁尾 */}
-          <tbody>
             <tr>
               <td>
                 {/* Client Info */}
