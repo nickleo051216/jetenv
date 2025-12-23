@@ -1481,7 +1481,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           <div class="notes-title">銀行帳號 Bank Account</div>
           <div class="notes-content">
             <div>戶名：傑太環境工程顧問有限公司</div>
-            <div>銀行：玉山銀行 - 土城分行</div>
+            <div>銀行：合作金庫 (006) 北土城分行</div>
             <div>帳號：5377 717 318387</div>
           </div>
         </div>
@@ -2087,7 +2087,7 @@ ${formData.companyContact || '張惟荏'}
                           <div className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">銀行帳號 Bank Account</div>
                           <div className="space-y-1 text-sm text-gray-700">
                             <div><span className="text-gray-500">戶名：</span>傑太環境工程顧問有限公司</div>
-                            <div><span className="text-gray-500">銀行：</span>玉山銀行 - 土城分行</div>
+                            <div><span className="text-gray-500">銀行：</span>合作金庫 (006) 北土城分行</div>
                             <div><span className="text-gray-500">帳號：</span><span className="font-mono font-semibold tracking-wider">5377 717 318387</span></div>
                           </div>
                         </div>
@@ -2102,7 +2102,7 @@ ${formData.companyContact || '張惟荏'}
                           <div className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">銀行帳號 Bank Account</div>
                           <div className="space-y-1 text-sm text-gray-700">
                             <div><span className="text-gray-500">戶名：</span>傑太環境工程顧問有限公司</div>
-                            <div><span className="text-gray-500">銀行：</span>玉山銀行 - 土城分行</div>
+                            <div><span className="text-gray-500">銀行：</span>合作金庫 (006) 北土城分行</div>
                             <div><span className="text-gray-500">帳號：</span><span className="font-mono font-semibold tracking-wider">5377 717 318387</span></div>
                           </div>
                         </div>
