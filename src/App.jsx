@@ -1225,6 +1225,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
       padding: 12px 16px; 
       border-radius: 8px; 
       border: 1px solid #99f6e4; 
+      margin-top: 12px;
       text-align: left;
     }
     .total-box {
@@ -1398,11 +1399,9 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           <span class="quote-info-label">有效期限：</span>
           <span>${formData.validUntil}</span>
         </div>
-        <div style="display: flex; gap: 12px; margin-top: 12px;">
-          <div class="project-box" style="flex: 1;">
-            <div class="project-label">專案名稱 Project Name</div>
-            <div class="project-name">${formData.projectName || '-'}</div>
-          </div>
+        <div class="project-box">
+          <div class="project-label">專案名稱 Project Name</div>
+          <div class="project-name">${formData.projectName || '-'}</div>
         </div>
       </div>
     </div>
