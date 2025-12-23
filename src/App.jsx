@@ -24,7 +24,7 @@ import {
 import {
   Plus, Trash2, FileText, Users, Printer, Save, Copy,
   ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, Stamp, ListPlus, X, Search, Edit, RotateCcw, FileCheck, ClipboardList, RefreshCw,
-  ChevronDown, ChevronRight, History, Send, Loader2 // ✨ 新增圖示
+  ChevronDown, ChevronRight, History, Send, Loader2, StickyNote // ✨ 新增圖示
 } from 'lucide-react';
 
 // --- 設定區：預設圖檔路徑 ---
