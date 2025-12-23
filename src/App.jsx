@@ -1398,12 +1398,10 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           <span class="quote-info-label">有效期限：</span>
           <span>${formData.validUntil}</span>
         </div>
-        <div style="display: flex; gap: 12px; margin-top: 12px;">
-          <div class="project-box">
+        <div class="project-box" style="margin-top: 12px;">
             <div class="project-label">專案名稱 Project Name</div>
             <div class="project-name">${formData.projectName || '-'}</div>
           </div>
-        </div>
       </div>
     </div>
 
