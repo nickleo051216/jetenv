@@ -866,7 +866,7 @@ const NoteSelector = ({ value, onChange, isPrintMode }) => {
     return (
       <div className="notes-block">
         <div className="notes-title">備註 Notes</div>
-        <div className="notes-content">{value || '-'}</div>
+        <div className="notes-content whitespace-pre-wrap">{value || '-'}</div>
       </div>
     );
   }
