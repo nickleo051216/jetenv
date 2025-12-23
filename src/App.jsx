@@ -1168,7 +1168,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
       <tr>
         <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #6b7280;">${idx + 1}</td>
         <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #111827;">${item.name || ''}</td>
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">${item.spec || ''}</td>
+        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">${(item.spec || '').replace(/\n/g, '<br/>')}</td>
         <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #374151;">${item.frequency || ''}</td>
         <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #374151;">${item.unit || ''}</td>
         <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${item.qty || 0}</td>
@@ -1477,7 +1477,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
         <div class="notes-section">
           <div class="notes-block">
             <div class="notes-title">備註 Notes</div>
-            <div class="notes-content">${formData.notes || '-'}</div>
+            <div class="notes-content">${(formData.notes || '-').replace(/\n/g, '<br/>')}</div>
           </div>
           <div class="notes-block">
             <div class="notes-title">付款方式</div>
