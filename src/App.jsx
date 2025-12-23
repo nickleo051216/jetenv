@@ -1356,7 +1356,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     }
     .stamp-img {
       position: absolute;
-      bottom: 2px;
+      bottom: 25px;
       left: 50%;
       transform: translateX(-50%);
       width: 140px;
@@ -2128,11 +2128,11 @@ ${formData.companyContact || '張惟荏'}
                           <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setStampPreview)} className="hidden" />
                         </label>
                       )}
-                      <div className="border-b border-gray-800 pb-2 mb-2"></div>
+                      <div className="border-b border-gray-800 h-20 mb-2"></div>
                       <p className="text-sm font-bold text-gray-600">傑太環境工程顧問有限公司 (簽章)</p>
                     </div>
                     <div className="flex-1 text-center">
-                      <div className="border-b border-gray-800 pb-2 mb-2 mt-[60px]"></div>
+                      <div className="border-b border-gray-800 h-20 mb-2"></div>
                       <p className="text-sm font-bold text-gray-600">客戶確認簽回 (簽章)</p>
                     </div>
                   </div>
