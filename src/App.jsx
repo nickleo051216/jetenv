@@ -24,7 +24,7 @@ import {
 import {
   Plus, Trash2, FileText, Users, Printer, Save, Copy,
   ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, Stamp, ListPlus, X, Search, Edit, RotateCcw, FileCheck, ClipboardList, RefreshCw,
-  ChevronDown, ChevronRight, History, Send, Loader2, StickyNote // ✨ 新增圖示
+  ChevronDown, ChevronRight, History, Send, Loader2 // ✨ 新增圖示
 } from 'lucide-react';
 
 // --- 設定區：預設圖檔路徑 ---
@@ -61,7 +61,7 @@ const PAYMENT_TERMS = [
   '驗收後並開立發票 60 天內付款',
   '驗收後並開立發票 90 天內付款'
 ];
-const DEFAULT_NOTE_TEMPLATES = [
+const NOTE_TEMPLATES = [
   {
     label: '標準條款 (30天效期)',
     content: '一、本報價單有效期限 30 天。\n二、報價內容不含施工期間水電費用。\n三、如蒙惠顧，請簽名回傳以便安排作業。'
@@ -211,44 +211,11 @@ const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸
 };
 
 const NoteSelector = ({ value, onChange, isPrintMode }) => {
-  const [templates, setTemplates] = useState([]);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'note_templates'), (s) => {
-      const dbTemplates = s.docs.map(d => ({ id: d.id, ...d.data() }));
-      // 合併預設範本與自定義範本
-      setTemplates([...DEFAULT_NOTE_TEMPLATES, ...dbTemplates]);
-    });
-    return () => unsub();
-  }, []);
-
   const handleTemplateChange = (e) => {
     const idx = e.target.value;
     if (idx === 'custom') return;
     if (idx !== '') {
-      onChange(templates[idx].content);
-    }
-  };
-
-  const saveAsTemplate = async () => {
-    if (!value.trim()) return alert('請先輸入備註內容');
-    const label = prompt('請輸入範本名稱：');
-    if (!label) return;
-
-    setSaving(true);
-    try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'note_templates'), {
-        label,
-        content: value,
-        createdAt: serverTimestamp()
-      });
-      alert('範本儲存成功！');
-    } catch (err) {
-      console.error(err);
-      alert('儲存失敗');
-    } finally {
-      setSaving(false);
+      onChange(NOTE_TEMPLATES[idx].content);
     }
   };
 
@@ -264,25 +231,14 @@ const NoteSelector = ({ value, onChange, isPrintMode }) => {
   return (
     <div className="w-full">
       <div className="flex justify-between items-center mb-1">
-        <div className="flex items-center gap-2">
-          <label className="block text-xs font-bold text-gray-500 uppercase">備註 Notes</label>
-          <button
-            onClick={saveAsTemplate}
-            disabled={saving}
-            className="text-[10px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded border border-teal-200 hover:bg-teal-100 transition-colors flex items-center gap-1"
-            title="將目前內容儲存為新範本"
-          >
-            <Save className="w-3 h-3" />
-            {saving ? '儲存中...' : '存為範本'}
-          </button>
-        </div>
+        <label className="block text-xs font-bold text-gray-500 uppercase">備註 Notes</label>
         <select
           className="text-xs border-none bg-transparent text-teal-600 font-medium focus:ring-0 cursor-pointer p-0"
           onChange={handleTemplateChange}
           defaultValue=""
         >
           <option value="" disabled>-- 快速載入範本 --</option>
-          {templates.map((t, i) => <option key={i} value={i}>{t.label}</option>)}
+          {NOTE_TEMPLATES.map((t, i) => <option key={i} value={i}>{t.label}</option>)}
           <option value="custom">手動編輯</option>
         </select>
       </div>
@@ -331,7 +287,6 @@ export default function App() {
                   { id: 'dashboard', label: '報價管理', icon: FileText },
                   { id: 'customers', label: '客戶通訊錄', icon: Users },
                   { id: 'products', label: '產品/服務庫', icon: Package },
-                  { id: 'notes', label: '備註管理', icon: StickyNote },
                 ].map(item => (
                   <button
                     key={item.id}
@@ -362,7 +317,6 @@ export default function App() {
         )}
         {view === 'customers' && <CustomerManager />}
         {view === 'products' && <ProductManager />}
-        {view === 'notes' && <NoteManager />}
         {view === 'editor' && (
           <QuoteEditor
             user={user}
@@ -945,7 +899,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     ],
     paymentMethod: '匯款',
     paymentTerms: '驗收後並開立發票 30 天內付款',
-    notes: DEFAULT_NOTE_TEMPLATES[0].content,
+    notes: NOTE_TEMPLATES[0].content,
     // 表格欄位寬度設定 (百分比)
     columnWidths: {
       name: 18,    // 項目名稱
@@ -1228,18 +1182,8 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
       margin-top: 12px;
       text-align: left;
     }
-    .total-box {
-      background: #fffbeb;
-      padding: 10px 14px;
-      border-radius: 8px;
-      border: 1px solid #fde68a;
-      min-width: 140px;
-    }
-    .project-label, .total-label { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
-    .project-label { color: #0d9488; }
-    .total-label { color: #b45309; }
+    .project-label { font-size: 11px; font-weight: 700; color: #0d9488; margin-bottom: 4px; }
     .project-name { font-size: 14px; color: #134e4a; font-weight: 500; }
-    .total-amount { font-size: 18px; font-weight: 700; color: #92400e; font-family: monospace; }
     
     /* Section */
     .section-title { 
@@ -1775,7 +1719,7 @@ ${formData.companyContact || '張惟荏'}
                             )}
                           </div>
                         </div>
-                        <div className="bg-teal-50 p-3 rounded border border-teal-100 flex-1">
+                        <div className="bg-teal-50 p-3 rounded border border-teal-100">
                           <label className="block text-xs font-bold text-teal-800 mb-1">專案名稱 Project Name</label>
                           {isPrintMode ? (
                             <div className="text-sm font-medium text-teal-900">{formData.projectName}</div>
@@ -1788,11 +1732,6 @@ ${formData.companyContact || '張惟荏'}
                             />
                           )}
                         </div>
-                        {/* 報價單總金額 - 暫時隱藏
-                        <div className="bg-amber-50 p-3 rounded border border-amber-200 min-w-[140px]">
-                          <label className="block text-xs font-bold text-amber-700 mb-1">報價金額 Total Amount</label>
-                          <div className="text-lg font-bold text-amber-800 font-mono">NT$ {grandTotal.toLocaleString()}</div>
-                        </div> */}
                       </div>
                     </div>
                   </header>
@@ -2062,54 +2001,38 @@ ${formData.companyContact || '張惟荏'}
 
                 {/* Footer Section: 合計與簽名 (放在 tbody 最後，避免佔用 tfoot 固定位置) */}
                 <div className="pt-4 page-break-inside-avoid">
-                  {/* 付款方式、期限、備註 - 全寬 */}
-                  <div className="space-y-4 break-inside-avoid">
-                    <SmartSelect label="付款方式 Payment Method" options={PAYMENT_METHODS} value={formData.paymentMethod} onChange={(val) => setFormData({ ...formData, paymentMethod: val })} isPrintMode={isPrintMode} />
-                    <SmartSelect label="付款期限 Payment Terms" options={PAYMENT_TERMS} value={formData.paymentTerms} onChange={(val) => setFormData({ ...formData, paymentTerms: val })} isPrintMode={isPrintMode} />
-                    <NoteSelector value={formData.notes} onChange={(val) => setFormData({ ...formData, notes: val })} isPrintMode={isPrintMode} />
-                  </div>
-                  {/* 銀行帳號 + 合計金額 - 並排 */}
-                  <div className="flex flex-col md:flex-row gap-4 mt-6 items-stretch">
-                    {/* 銀行帳號資訊 */}
-                    <div className="flex-1">
-                      <div className="bg-teal-50 p-4 rounded-lg border-l-4 border-teal-500 h-full">
-                        <div className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">匯款帳號 Bank Account</div>
-                        <div className="space-y-1 text-sm text-gray-700">
-                          <div><span className="text-gray-500">戶名：</span>傑太環境工程顧問有限公司</div>
-                          <div><span className="text-gray-500">銀行：</span>合作金庫 - 北土城分行</div>
-                          <div><span className="text-gray-500">帳號：</span><span className="font-mono font-semibold tracking-wider">5377 717 318387</span></div>
-                        </div>
-                      </div>
+                  <div className="flex flex-col md:flex-row gap-8 break-inside-avoid">
+                    <div className="flex-1 space-y-4">
+                      <SmartSelect label="付款方式 Payment Method" options={PAYMENT_METHODS} value={formData.paymentMethod} onChange={(val) => setFormData({ ...formData, paymentMethod: val })} isPrintMode={isPrintMode} />
+                      <SmartSelect label="付款期限 Payment Terms" options={PAYMENT_TERMS} value={formData.paymentTerms} onChange={(val) => setFormData({ ...formData, paymentTerms: val })} isPrintMode={isPrintMode} />
+                      <NoteSelector value={formData.notes} onChange={(val) => setFormData({ ...formData, notes: val })} isPrintMode={isPrintMode} />
                     </div>
-                    {/* 合計金額 - 較小框 */}
-                    <div className="w-full md:w-64">
-                      <div className="bg-gray-50 p-4 rounded-lg space-y-2 border border-gray-200 h-full">
-                        <div className="flex justify-between text-sm text-gray-600"><span>合計</span><span className="font-mono">NT$ {subtotal.toLocaleString()}</span></div>
-                        <div className="flex justify-between text-sm text-gray-600"><span>營業稅 5%</span><span className="font-mono">NT$ {tax.toLocaleString()}</span></div>
-                        <div className="border-t border-gray-300 my-1"></div>
-                        <div className="flex justify-between items-baseline"><span className="text-sm font-bold text-gray-800">總計</span><span className="text-lg font-bold text-teal-700 font-mono">NT$ {grandTotal.toLocaleString()}</span></div>
+                    <div className="w-full md:w-80">
+                      <div className="bg-gray-50 p-6 rounded-lg space-y-3 border border-gray-200">
+                        <div className="flex justify-between text-sm text-gray-600"><span>合計 (Subtotal)</span><span className="font-mono">NT$ {subtotal.toLocaleString()}</span></div>
+                        <div className="flex justify-between text-sm text-gray-600"><span>營業稅 (Tax 5%)</span><span className="font-mono">NT$ {tax.toLocaleString()}</span></div>
+                        <div className="border-t border-gray-300 my-2"></div>
+                        <div className="flex justify-between items-baseline"><span className="text-base font-bold text-gray-800">總計 (Total)</span><span className="text-xl font-bold text-teal-700 font-mono">NT$ {grandTotal.toLocaleString()}</span></div>
+                        <div className="text-right text-xs text-gray-400 mt-1">幣別：新台幣 (TWD)</div>
                       </div>
                     </div>
                   </div>
 
-                  <div className={`mt-16 flex justify-between gap-16 ${!isPrintMode ? 'opacity-50 hover:opacity-100 transition-opacity' : ''}`}>
-                    {/* 左側：公司簽章 */}
-                    <div className="flex-1 flex flex-col items-center">
-                      <div className="w-full h-28 flex items-end justify-center relative">
-                        <img src={stampPreview} alt="Company Stamp" className="w-32 h-32 object-contain opacity-80" onError={(e) => { e.target.style.display = 'none'; }} />
-                        {!isPrintMode && (
-                          <label className="absolute inset-0 cursor-pointer z-20" title="點擊上傳其他印章">
-                            <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setStampPreview)} className="hidden" />
-                          </label>
-                        )}
+                  <div className={`mt-24 flex justify-between gap-16 ${!isPrintMode ? 'opacity-50 hover:opacity-100 transition-opacity' : ''}`}>
+                    <div className="flex-1 text-center relative group">
+                      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-32 h-32 z-10 pointer-events-none">
+                        <img src={stampPreview} alt="Company Stamp" className="w-full h-full object-contain opacity-80" onError={(e) => { e.target.style.display = 'none'; }} />
                       </div>
-                      <div className="w-full border-b border-gray-800 mt-0 mb-2"></div>
+                      {!isPrintMode && (
+                        <label className="absolute inset-0 cursor-pointer z-20" title="點擊上傳其他印章">
+                          <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, setStampPreview)} className="hidden" />
+                        </label>
+                      )}
+                      <div className="border-b border-gray-800 pb-2 mb-2"></div>
                       <p className="text-sm font-bold text-gray-600">傑太環境工程顧問有限公司 (簽章)</p>
                     </div>
-                    {/* 右側：客戶簽章 */}
-                    <div className="flex-1 flex flex-col items-center">
-                      <div className="w-full h-28"></div>
-                      <div className="w-full border-b border-gray-800 mt-0 mb-2"></div>
+                    <div className="flex-1 text-center">
+                      <div className="border-b border-gray-800 pb-2 mb-2 mt-[60px]"></div>
                       <p className="text-sm font-bold text-gray-600">客戶確認簽回 (簽章)</p>
                     </div>
                   </div>
@@ -2140,7 +2063,7 @@ ${formData.companyContact || '張惟荏'}
         
         @media print {
           @page { 
-            margin: 65mm 10mm 20mm 10mm;
+            margin: 10mm 10mm 20mm 10mm;
             size: A4 portrait; 
           }
           html, body, #root { 
@@ -2156,33 +2079,10 @@ ${formData.companyContact || '張惟荏'}
           .print-container { padding: 0; margin: 0; width: 100%; }
           .page-break-inside-avoid { page-break-inside: avoid; }
           
-          /* 銀行帳號 + 合計金額：列印時強制並排 */
-          .items-stretch {
-            display: flex !important;
-            flex-direction: row !important;
-            gap: 1rem !important;
-          }
-          .items-stretch > .flex-1 {
-            flex: 1 !important;
-          }
-          .items-stretch > .md\\:w-64 {
-            width: 200px !important;
-            flex-shrink: 0 !important;
-          }
-          
           /* 表格分頁設定 */
           table { width: 100%; border-collapse: collapse; }
-          thead { 
-            display: block !important;
-            position: fixed !important;
-            top: 0 !important;
-            left: 10mm !important;
-            right: 10mm !important;
-            width: calc(100% - 20mm) !important;
-            background: white !important;
-            z-index: 999 !important;
-          }
-          tbody { display: block !important; }
+          thead { display: table-header-group !important; }
+          tbody { display: table-row-group !important; }
           tfoot { display: table-row-group !important; }
           
           /* 列印頁尾：固定在每頁底部 */
@@ -2628,144 +2528,6 @@ const ProductManager = () => {
         </table>
       </div>
       <style>{`.input-std { @apply border-gray-300 rounded text-sm focus:ring-teal-500 focus:border-teal-500 w-full; }`}</style>
-    </div>
-  );
-};
-
-// --- Note Manager ---
-const NoteManager = () => {
-  const [templates, setTemplates] = useState([]);
-  const [form, setForm] = useState({ label: '', content: '' });
-  const [editingId, setEditingId] = useState(null);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'note_templates'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setTemplates(docs);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.label || !form.content) return alert('請填寫完整資訊');
-
-    setSaving(true);
-    try {
-      if (editingId) {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'note_templates', editingId), {
-          ...form,
-          updatedAt: serverTimestamp()
-        });
-        setEditingId(null);
-      } else {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'note_templates'), {
-          ...form,
-          createdAt: serverTimestamp()
-        });
-      }
-      setForm({ label: '', content: '' });
-    } catch (err) {
-      console.error(err);
-      alert('儲存失敗');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEdit = (template) => {
-    setForm({ label: template.label, content: template.content });
-    setEditingId(template.id);
-  };
-
-  const handleDelete = async (id) => {
-    if (confirm('確定要刪除此範本嗎？')) {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'note_templates', id));
-    }
-  };
-
-  const handleCancel = () => {
-    setEditingId(null);
-    setForm({ label: '', content: '' });
-  };
-
-  return (
-    <div className="space-y-6 w-full">
-      {/* 新增/編輯表單 */}
-      <div className="bg-white p-6 rounded-lg shadow border border-gray-200 w-full">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-lg text-teal-800 flex items-center">
-            {editingId ? <Edit className="w-5 h-5 mr-1" /> : <StickyNote className="w-5 h-5 mr-1" />}
-            {editingId ? '編輯備註範本' : '新增備註範本'}
-          </h3>
-          {editingId && (
-            <button onClick={handleCancel} className="text-xs flex items-center text-gray-500 hover:text-gray-700">
-              <RotateCcw className="w-3 h-3 mr-1" /> 取消編輯
-            </button>
-          )}
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">範本名稱 (Label)</label>
-            <input
-              className="input-std"
-              placeholder="例如：標準報價條款"
-              value={form.label}
-              onChange={e => setForm({ ...form, label: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">備註內容 (Content)</label>
-            <textarea
-              className="input-std h-32"
-              placeholder="請輸入詳細備註內容..."
-              value={form.content}
-              onChange={e => setForm({ ...form, content: e.target.value })}
-            />
-          </div>
-          <button
-            disabled={saving}
-            className={`text-white py-2 px-4 rounded w-full transition-colors ${editingId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-teal-600 hover:bg-teal-700'}`}
-          >
-            {saving ? '處理中...' : (editingId ? '更新範本' : '新增範本')}
-          </button>
-        </form>
-      </div>
-
-      {/* 範本列表 */}
-      <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200 w-full">
-        <div className="p-4 border-b border-gray-200 bg-gray-50">
-          <h3 className="font-bold text-gray-700">現有範本列表 ({templates.length})</h3>
-        </div>
-        <div className="divide-y divide-gray-200">
-          {templates.map(t => (
-            <div key={t.id} className={`p-4 ${editingId === t.id ? 'bg-orange-50' : 'hover:bg-gray-50'}`}>
-              <div className="flex justify-between items-start mb-2">
-                <h4 className="font-bold text-teal-800">{t.label}</h4>
-                <div className="flex space-x-2">
-                  <button onClick={() => handleEdit(t)} className="text-gray-400 hover:text-orange-500" title="編輯">
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => handleDelete(t.id)} className="text-gray-400 hover:text-red-500" title="刪除">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              <pre className="text-sm text-gray-600 whitespace-pre-wrap font-sans bg-gray-50 p-2 rounded border border-gray-100">
-                {t.content}
-              </pre>
-            </div>
-          ))}
-          {templates.length === 0 && (
-            <div className="p-8 text-center text-gray-500">
-              尚無自訂備註範本
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 };
