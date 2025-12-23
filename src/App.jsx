@@ -1226,6 +1226,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
       border-radius: 8px; 
       border: 1px solid #ccfbf1;
       flex: 1;
+      text-align: left;
     }
     .total-box {
       background: #fffbeb;
