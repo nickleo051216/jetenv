@@ -2068,9 +2068,9 @@ ${formData.companyContact || '張惟荏'}
                       <SmartSelect label="付款期限 Payment Terms" options={PAYMENT_TERMS} value={formData.paymentTerms} onChange={(val) => setFormData({ ...formData, paymentTerms: val })} isPrintMode={isPrintMode} />
                       <NoteSelector value={formData.notes} onChange={(val) => setFormData({ ...formData, notes: val })} isPrintMode={isPrintMode} />
                     </div>
-                    <div className="w-full md:w-80">
+                    <div className="w-full md:flex-1 flex flex-col md:flex-row gap-4">
                       {/* 銀行帳號 */}
-                      <div className="bg-teal-50 p-4 rounded-lg border-l-4 border-teal-500 mb-4">
+                      <div className="flex-1 bg-teal-50 p-4 rounded-lg border-l-4 border-teal-500">
                         <div className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">銀行帳號 Bank Account</div>
                         <div className="space-y-1 text-sm text-gray-700">
                           <div><span className="text-gray-500">戶名：</span>傑太環境工程顧問有限公司</div>
@@ -2080,7 +2080,7 @@ ${formData.companyContact || '張惟荏'}
                       </div>
 
                       {/* 總計 */}
-                      <div className="bg-gray-50 p-6 rounded-lg space-y-3 border border-gray-200">
+                      <div className="flex-1 bg-gray-50 p-6 rounded-lg space-y-3 border border-gray-200">
                         <div className="flex justify-between text-sm text-gray-600"><span>合計 (Subtotal)</span><span className="font-mono">NT$ {subtotal.toLocaleString()}</span></div>
                         <div className="flex justify-between text-sm text-gray-600"><span>營業稅 (Tax 5%)</span><span className="font-mono">NT$ {tax.toLocaleString()}</span></div>
                         <div className="border-t border-gray-300 my-2"></div>
@@ -2683,7 +2683,7 @@ const NoteManager = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">範本名稱 (Label)</label>
             <input
-              className="input-std"
+              className="w-full border-gray-300 rounded text-sm focus:ring-teal-500 focus:border-teal-500"
               placeholder="例如：一般付款條款、工程備註..."
               value={form.label}
               onChange={e => setForm({ ...form, label: e.target.value })}
@@ -2692,7 +2692,7 @@ const NoteManager = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">備註內容 (Content)</label>
             <textarea
-              className="input-std h-32"
+              className="w-full border-gray-300 rounded text-sm focus:ring-teal-500 focus:border-teal-500 h-32"
               placeholder="請輸入備註詳細內容..."
               value={form.content}
               onChange={e => setForm({ ...form, content: e.target.value })}
