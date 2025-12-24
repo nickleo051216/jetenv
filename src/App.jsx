@@ -1012,7 +1012,8 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           quoteHtml
         })
       });
-      return response.ok;
+      const data = await response.json().catch(() => ({}));
+      return response.ok && data.status === 'success';
     } catch (e) {
       console.error('雲端同步失敗:', e);
       return false;
