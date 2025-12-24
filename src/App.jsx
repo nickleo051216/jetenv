@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore';
 import {
   Plus, Trash2, FileText, Users, Printer, Save, Copy,
-  ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, Stamp, ListPlus, X, Search, Edit, RotateCcw, FileCheck, ClipboardList, RefreshCw,
+  ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, AlertTriangle, Stamp, ListPlus, X, Search, Edit, RotateCcw, FileCheck, ClipboardList, RefreshCw,
   ChevronDown, ChevronRight, History, Send, Loader2, StickyNote // ✨ 新增圖示
 } from 'lucide-react';
 
@@ -826,8 +826,49 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
   );
 };
 
-// --- n8n Email API 設定 ---
+// --- n8n設定 ---
 const N8N_EMAIL_API_URL = 'https://jetenv.zeabur.app/webhook/email';
+const N8N_SYNC_API_URL = 'https://jetenv.zeabur.app/webhook/sync-quotation';
+
+// --- Toast 元件：支援成功/失敗狀態與平滑淡出 ---
+const Toast = ({ isVisible, message, type = 'success', onClose }) => {
+  const [isRendered, setIsRendered] = useState(false);
+  const [isFading, setIsFading] = useState(false);
+
+  useEffect(() => {
+    if (isVisible) {
+      setIsRendered(true);
+      setIsFading(false);
+      const timer = setTimeout(() => {
+        setIsFading(true);
+        setTimeout(() => {
+          setIsRendered(false);
+          onClose();
+        }, 800);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible, onClose]);
+
+  if (!isRendered) return null;
+
+  const isError = type === 'error';
+
+  return (
+    <div
+      className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[10000] transition-all duration-700 ease-out ${isFading ? 'opacity-0 translate-y-4 scale-95' : 'opacity-100 translate-y-0 scale-100'
+        }`}
+    >
+      <div className={`bg-gradient-to-tr ${isError ? 'from-orange-600 to-red-700' : 'from-teal-600 to-teal-800'
+        } text-white px-8 py-3.5 rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.2)] flex items-center gap-4 border border-white/20 backdrop-blur-sm`}>
+        <div className="bg-white/20 p-1 rounded-full">
+          {isError ? <AlertTriangle className="w-5 h-5 text-white" /> : <CheckCircle className="w-5 h-5 text-white" />}
+        </div>
+        <span className="font-semibold tracking-wide">{message}</span>
+      </div>
+    </div>
+  );
+};
 
 // --- Sending Overlay 元件：一鍵寄出時的 Loading 畫面 ---
 const SendingOverlay = ({ isVisible, message }) => {
@@ -950,6 +991,33 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
   const [sendingMessage, setSendingMessage] = useState(''); // Loading 訊息
   const [logoPreview, setLogoPreview] = useState(DEFAULT_LOGO_PATH);
   const [stampPreview, setStampPreview] = useState(STAMP_BASE64);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('success');
+
+  // --- 雲端同步邏輯 (n8n Webhook) ---
+  const handleCloudSync = async (mode = 'update') => {
+    try {
+      const quoteHtml = capturePrintHtml();
+      const response = await fetch(N8N_SYNC_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode, // 'update' 或 'create'
+          quoteNumber: formData.quoteNumber,
+          projectName: formData.projectName,
+          clientName: formData.clientName,
+          grandTotal: grandTotal,
+          quoteHtml
+        })
+      });
+      return response.ok;
+    } catch (e) {
+      console.error('雲端同步失敗:', e);
+      return false;
+    }
+  };
+
 
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -1149,16 +1217,27 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     if (!silent) setSaving(true);
     const payload = { ...formData, ...updates, subtotal, tax, grandTotal, updatedAt: serverTimestamp() };
     try {
+      const isNewQuote = !quoteId;
+      let newId = quoteId;
+
       if (quoteId) {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', quoteId), payload);
       } else {
         const ref = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'), {
           ...payload, createdAt: serverTimestamp()
         });
-        if (!quoteId) setActiveQuoteId(ref.id);
+        newId = ref.id;
+        if (!quoteId) setActiveQuoteId(newId);
       }
       await syncCustomerData(updates.clientName || formData.clientName, { ...formData, ...updates });
       await syncProductData(formData.items);
+      if (!silent) {
+        // 分成 'create' (新建立) 與 'update' (覆蓋更新)
+        const syncSuccess = await handleCloudSync(isNewQuote ? 'create' : 'update');
+        setToastType(syncSuccess ? 'success' : 'error');
+        setToastMessage(syncSuccess ? '儲存成功，並已同步至雲端' : '儲存成功，但雲端同步失敗');
+        setShowToast(true);
+      }
     } catch (e) { console.error(e); alert('儲存失敗'); }
     if (!silent) setSaving(false);
   };
@@ -1182,6 +1261,10 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
     };
 
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'), payload);
+    const syncSuccess = await handleCloudSync('version');
+    setToastType(syncSuccess ? 'success' : 'error');
+    setToastMessage(syncSuccess ? '已建立新版本，並已同步至雲端' : '已建立新版本，但雲端同步失敗');
+    setShowToast(true);
     setSaving(false);
     onBack();
   };
@@ -2734,6 +2817,12 @@ ${formData.companyContact || '張惟荏'}
         }
       `}</style>
       </div>
+      <Toast
+        isVisible={showToast}
+        message={toastMessage}
+        type={toastType}
+        onClose={() => setShowToast(false)}
+      />
     </>
   );
 };
