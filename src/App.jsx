@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore';
 import {
   Plus, Trash2, FileText, Users, Printer, Save, Copy,
-  ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, AlertTriangle, Stamp, ListPlus, X, Search, Edit, RotateCcw, FileCheck, ClipboardList, RefreshCw,
+  ArrowLeft, Package, Upload, Image as ImageIcon, CheckCircle, AlertTriangle, Stamp, ListPlus, X, Search, Edit, RotateCcw, FileCheck, ClipboardList, RefreshCw, XCircle,
   ChevronDown, ChevronRight, History, Send, Loader2, StickyNote // ✨ 新增圖示
 } from 'lucide-react';
 
@@ -220,6 +220,16 @@ export default function App() {
   const [activeQuoteId, setActiveQuoteId] = useState(null);
   const [printMode, setPrintMode] = useState(false);
 
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('success');
+
+  const triggerToast = (message, type = 'success') => {
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       await signInAnonymously(auth);
@@ -272,6 +282,7 @@ export default function App() {
         {view === 'dashboard' && (
           <Dashboard
             user={user}
+            triggerToast={triggerToast}
             onEdit={(id) => { setActiveQuoteId(id); setView('editor'); }}
             onCreate={() => { setActiveQuoteId(null); setView('editor'); }}
             onDuplicate={(id) => { setActiveQuoteId(id); setView('editor'); }}
@@ -285,18 +296,26 @@ export default function App() {
             user={user}
             quoteId={activeQuoteId}
             setActiveQuoteId={setActiveQuoteId}
+            triggerToast={triggerToast}
             onBack={() => setView('dashboard')}
             onPrintToggle={setPrintMode}
             isPrintMode={printMode}
           />
         )}
       </main>
+
+      <Toast
+        isVisible={showToast}
+        message={toastMessage}
+        type={toastType}
+        onClose={() => setShowToast(false)}
+      />
     </div>
   );
 }
 
 // --- Dashboard ---
-const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
+const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
   const [quotes, setQuotes] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -333,8 +352,30 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
-    if (confirm('確定要刪除此報價單嗎？')) {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', id));
+    const quoteToDelete = quotes.find(q => q.id === id);
+    if (!quoteToDelete) return;
+
+    if (confirm(`確定要刪除「${quoteToDelete.projectName || quoteToDelete.quoteNumber}」嗎？`)) {
+      try {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', id));
+        triggerToast('報價單已刪除');
+
+        // --- 雲端同步刪除 (Fire and Forget) ---
+        fetch(N8N_SYNC_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'delete',
+            quoteNumber: quoteToDelete.quoteNumber,
+            projectName: quoteToDelete.projectName,
+            filename: `${quoteToDelete.quoteNumber}-${quoteToDelete.projectName}`
+          })
+        }).catch(err => console.error('雲端刪除同步失敗:', err));
+
+      } catch (err) {
+        console.error(err);
+        alert('刪除失敗');
+      }
     }
   };
 
@@ -458,7 +499,9 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
   const tabFilteredQuotes = useMemo(() => {
     return displayedQuotes.filter(q => {
       if (activeTab === 'quotes') {
-        return ['draft', 'sent', 'confirmed', 'cancelled'].includes(q.status) || !q.status;
+        return (['draft', 'sent', 'confirmed'].includes(q.status) || !q.status);
+      } else if (activeTab === 'cancelled') {
+        return q.status === 'cancelled';
       } else {
         return q.status === 'ordered';
       }
@@ -467,14 +510,17 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
 
   // 4. 統計數據
   const stats = useMemo(() => {
-    const inProgress = displayedQuotes.filter(q => ['draft', 'sent', 'confirmed', 'cancelled'].includes(q.status) || !q.status);
+    const inProgress = displayedQuotes.filter(q => ['draft', 'sent', 'confirmed'].includes(q.status) || !q.status);
     const ordered = displayedQuotes.filter(q => q.status === 'ordered');
+    const cancelled = displayedQuotes.filter(q => q.status === 'cancelled');
 
     return {
       inProgressCount: inProgress.length,
       inProgressTotal: inProgress.reduce((sum, q) => sum + (q.grandTotal || 0), 0),
       orderedCount: ordered.length,
       orderedTotal: ordered.reduce((sum, q) => sum + (q.grandTotal || 0), 0),
+      cancelledCount: cancelled.length,
+      cancelledTotal: cancelled.reduce((sum, q) => sum + (q.grandTotal || 0), 0),
       allTotal: displayedQuotes.reduce((sum, q) => sum + (q.grandTotal || 0), 0)
     };
   }, [displayedQuotes]);
@@ -516,7 +562,7 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
       </div>
 
       {/* 統計卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -539,6 +585,19 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
             <div className="text-right">
               <p className="text-xs text-green-500">總金額 (折疊後)</p>
               <p className="text-lg font-bold text-green-700">NT$ {stats.orderedTotal.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow border border-red-200 p-4 bg-red-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-red-600">已取消案件</p>
+              <p className="text-2xl font-bold text-red-800">{stats.cancelledCount} 件</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-red-500">總金額 (折疊後)</p>
+              <p className="text-lg font-bold text-red-700">NT$ {stats.cancelledTotal.toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -658,6 +717,16 @@ const Dashboard = ({ user, onEdit, onCreate, onDuplicate }) => {
         >
           <FileCheck className="w-4 h-4 mr-2" />
           已回簽訂單 ({stats.orderedCount})
+        </button>
+        <button
+          onClick={() => setActiveTab('cancelled')}
+          className={`flex items-center py-2 px-6 border-b-2 font-medium text-sm transition-colors ${activeTab === 'cancelled'
+            ? 'border-red-600 text-red-700'
+            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+        >
+          <XCircle className="w-4 h-4 mr-2" />
+          已取消 ({stats.cancelledCount})
         </button>
       </div>
 
@@ -984,16 +1053,13 @@ const NoteSelector = ({ value, onChange, isPrintMode }) => {
     </div>
   );
 };
-const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, isPrintMode }) => {
+const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, onPrintToggle, isPrintMode }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false); // 寄送狀態
   const [sendingMessage, setSendingMessage] = useState(''); // Loading 訊息
   const [logoPreview, setLogoPreview] = useState(DEFAULT_LOGO_PATH);
   const [stampPreview, setStampPreview] = useState(STAMP_BASE64);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState('success');
 
   // --- 雲端同步邏輯 (n8n Webhook) ---
   const handleCloudSync = async (mode = 'update') => {
@@ -1236,9 +1302,10 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
       if (!silent) {
         // 分成 'create' (新建立) 與 'update' (覆蓋更新)
         const syncSuccess = await handleCloudSync(isNewQuote ? 'create' : 'update');
-        setToastType(syncSuccess ? 'success' : 'error');
-        setToastMessage(syncSuccess ? '儲存成功，並已同步至雲端' : '儲存成功，但雲端同步失敗');
-        setShowToast(true);
+        triggerToast(
+          syncSuccess ? '儲存成功，並已同步至雲端' : '儲存成功，但雲端同步失敗',
+          syncSuccess ? 'success' : 'error'
+        );
       }
     } catch (e) { console.error(e); alert('儲存失敗'); }
     if (!silent) setSaving(false);
@@ -1264,9 +1331,10 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
 
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'), payload);
     const syncSuccess = await handleCloudSync('version');
-    setToastType(syncSuccess ? 'success' : 'error');
-    setToastMessage(syncSuccess ? '已建立新版本，並已同步至雲端' : '已建立新版本，但雲端同步失敗');
-    setShowToast(true);
+    triggerToast(
+      syncSuccess ? '已建立新版本，並已同步至雲端' : '已建立新版本，但雲端同步失敗',
+      syncSuccess ? 'success' : 'error'
+    );
     setSaving(false);
     onBack();
   };
@@ -2819,12 +2887,6 @@ ${formData.companyContact || '張惟荏'}
         }
       `}</style>
       </div>
-      <Toast
-        isVisible={showToast}
-        message={toastMessage}
-        type={toastType}
-        onClose={() => setShowToast(false)}
-      />
     </>
   );
 };
