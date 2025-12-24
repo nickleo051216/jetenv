@@ -1006,6 +1006,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, onBack, onPrintToggle, i
           mode, // 'update' 或 'create'
           quoteNumber: formData.quoteNumber,
           projectName: formData.projectName,
+          filename: `${formData.quoteNumber}-${formData.projectName}`,
           clientName: formData.clientName,
           grandTotal: grandTotal,
           quoteHtml
