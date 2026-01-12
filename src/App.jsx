@@ -18,8 +18,10 @@ import {
   serverTimestamp,
   where,
   getDocs,
+  getDocs,
   orderBy,
-  limit
+  limit,
+  runTransaction // ✨ 新增 import
 } from 'firebase/firestore';
 import {
   Plus, Trash2, FileText, Users, Printer, Save, Copy,
@@ -1122,8 +1124,11 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
       qty: 5,      // 數量
       price: 8,    // 單價
       total: 10    // 複價
-    }
+    },
+    quoteNumber: quoteId ? '' : '(系統自動生成)' // ✨ 預設顯示自動生成
   });
+
+  const [isDirty, setIsDirty] = useState(false); // ✨ 新增 Dirty Check 狀態
 
   useEffect(() => {
     const unsubC = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), s => setCustomers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -1131,17 +1136,17 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
     return () => { unsubC(); unsubP(); };
   }, []);
 
-  // 自動流水號：如果是新增模式(沒有quoteId)，自動去抓下一號
-  useEffect(() => {
-    if (!quoteId) {
-      const fetchSeq = async () => {
-        const nextNum = await getNextQuoteNumber(db, appId);
-        // 更新表單中的單號
-        setFormData(prev => ({ ...prev, quoteNumber: nextNum }));
-      };
-      fetchSeq();
-    }
-  }, [quoteId]);
+  // ✨ 移除自動流水號 useEffect，改為儲存時生成
+  // useEffect(() => {
+  //   if (!quoteId) {
+  //     const fetchSeq = async () => {
+  //       const nextNum = await getNextQuoteNumber(db, appId);
+  //       // 更新表單中的單號
+  //       setFormData(prev => ({ ...prev, quoteNumber: nextNum }));
+  //     };
+  //     fetchSeq();
+  //   }
+  // }, [quoteId]);
 
   useEffect(() => {
     if (quoteId) {
@@ -1168,6 +1173,25 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
   const subtotal = useMemo(() => formData.items.reduce((sum, item) => sum + (item.price * item.qty), 0), [formData.items]);
   const tax = Math.round(subtotal * 0.05);
   const grandTotal = subtotal + tax;
+
+  // ✨ 監聽表單變更，設定 Dirty 狀態
+  useEffect(() => {
+    if (formData && !loading) {
+      // 這裡簡單處理：只要不是初始狀態就視為 Dirty
+      // 注意：這裡假設 loading 結束後 formData 已被正確設定
+      if (quoteId) { // 編輯模式
+        setIsDirty(true);
+      } else { // 新增模式
+        // 檢查是否與初始狀態不同 (這裡簡化判斷，只要有輸入就算)
+        if (formData.clientName || formData.items.length > 1 || formData.items[0].name !== '顧問諮詢服務') {
+          setIsDirty(true);
+        }
+      }
+    }
+  }, [formData, subtotal, tax, grandTotal]);
+
+  // 修正初始載入造成的 Dirty
+  useEffect(() => { setIsDirty(false); }, [quoteId]); // 切換單號時重置
 
   const handleItemChange = (id, field, value) => {
     setFormData(prev => ({
@@ -1283,22 +1307,98 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
 
   const save = async (silent = false, updates = {}) => {
     if (!silent) setSaving(true);
-    const payload = { ...formData, ...updates, subtotal, tax, grandTotal, updatedAt: serverTimestamp() };
+    // const payload = { ...formData, ...updates, subtotal, tax, grandTotal, updatedAt: serverTimestamp() }; // 移到下方動態生成
+
     try {
       const isNewQuote = !quoteId;
       let newId = quoteId;
+      let finalQuoteNumber = formData.quoteNumber;
 
-      if (quoteId) {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', quoteId), payload);
-      } else {
-        const ref = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'), {
-          ...payload, createdAt: serverTimestamp()
+      if (isNewQuote) {
+        // ✨✨✨ 新增模式：使用 Transaction 原子性生成單號 ✨✨✨
+        await runTransaction(db, async (transaction) => {
+          // 1. 準備計數器 Ref
+          const counterRef = doc(db, 'artifacts', appId, 'public', 'data', 'sys_counters', 'quotations');
+          const counterDoc = await transaction.get(counterRef);
+
+          let nextSeq = 1;
+          const now = new Date();
+          const yy = String(now.getFullYear()).slice(-2);
+          const mm = String(now.getMonth() + 1).padStart(2, '0');
+          const prefix = `J-${yy}-${mm}`;
+
+          if (counterDoc.exists()) {
+            const data = counterDoc.data();
+            // 如果跨月了，重置為 1 (這裡假設 sequence 是跨月不重置，如果要跨月重置需加邏輯，這裡依據舊邏輯似乎是延續的，但通常會重置。為了安全先延續舊邏輯：只看數字)
+            // 修正：舊邏輯是 J-YY-MMXXX，並沒有跨月重置的明確代碼，只是取最後一筆+1。
+            // 這裡我們實作一個更安全的邏輯：如果是同一個月，則累加；不同月則重置(可選)。
+            // 為了保持與舊資料相容，我們先讀取 currentSeq。
+
+            // 檢查是否同一個月 (可選，若不需要跨月重置，直接加)
+            // 這裡簡單實作：直接 +1，確保不重複即可
+            const currentSeq = data.currentSeq || 0;
+            nextSeq = currentSeq + 1;
+          } else {
+            // 如果計數器不存在（第一次上線），先去撈一次舊資料的最大值來初始化 (Fallback)
+            // 避免突然從 001 開始造成重複
+            const q = query(
+              collection(db, 'artifacts', appId, 'public', 'data', 'quotations'),
+              orderBy('quoteNumber', 'desc'),
+              limit(1)
+            );
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+              const lastId = snapshot.docs[0].data().quoteNumber;
+              // 嘗試解析 J-YY-MMXXX
+              if (lastId && lastId.match(/J-\d{2}-\d{2}\d{3}/)) {
+                const baseId = lastId.split('-V')[0]; // 去除版本號
+                const lastSeqStr = baseId.slice(-3); // 取後三碼
+                const lastSeqNum = parseInt(lastSeqStr, 10);
+                if (!isNaN(lastSeqNum)) {
+                  nextSeq = lastSeqNum + 1;
+                }
+              }
+            }
+          }
+
+          // 格式化單號
+          const seqStr = String(nextSeq).padStart(3, '0');
+          finalQuoteNumber = `${prefix}${seqStr}`;
+
+          // 2. 寫回計數器
+          transaction.set(counterRef, { currentSeq: nextSeq, lastUpdated: serverTimestamp() }, { merge: true });
+
+          // 3. 建立新報價單
+          const newQuoteRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'));
+          newId = newQuoteRef.id;
+
+          const payload = {
+            ...formData,
+            ...updates,
+            quoteNumber: finalQuoteNumber, // 寫入正確單號
+            subtotal, tax, grandTotal,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          };
+
+          transaction.set(newQuoteRef, payload);
         });
-        newId = ref.id;
+
+        // Transaction 成功後，更新本地狀態
         if (!quoteId) setActiveQuoteId(newId);
+        setFormData(prev => ({ ...prev, quoteNumber: finalQuoteNumber }));
+
+      } else {
+        // ✨ 既有模式：直接更新
+        const payload = { ...formData, ...updates, subtotal, tax, grandTotal, updatedAt: serverTimestamp() };
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', quoteId), payload);
       }
+
       await syncCustomerData(updates.clientName || formData.clientName, { ...formData, ...updates });
       await syncProductData(formData.items);
+
+      setIsDirty(false); // ✨ 儲存成功，清除 Dirty 狀態
+
       if (!silent) {
         // 分成 'create' (新建立) 與 'update' (覆蓋更新)
         const syncSuccess = await handleCloudSync(isNewQuote ? 'create' : 'update');
@@ -1307,7 +1407,10 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
           syncSuccess ? 'success' : 'error'
         );
       }
-    } catch (e) { console.error(e); alert('儲存失敗'); }
+    } catch (e) {
+      console.error("儲存失敗:", e);
+      alert(`儲存失敗: ${e.message}`);
+    }
     if (!silent) setSaving(false);
   };
 
