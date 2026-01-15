@@ -212,6 +212,85 @@ const SmartSelect = ({ label, options, value, onChange, placeholder = "手動輸
   );
 };
 
+// --- 可搜尋的客戶選擇元件 ---
+const SearchableClientSelect = ({ customers, onSelect, placeholder = "搜尋客戶名稱或統編..." }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  // 過濾客戶列表 (支援名稱、統編搜尋)
+  const filteredCustomers = useMemo(() => {
+    if (!search) return customers;
+    const lowerSearch = search.toLowerCase();
+    return customers.filter(c =>
+      c.name?.toLowerCase().includes(lowerSearch) ||
+      c.taxId?.includes(search)
+    );
+  }, [customers, search]);
+
+  // 點擊外部關閉下拉選單
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (customer) => {
+    onSelect(customer);
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder={placeholder}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onFocus={() => setIsOpen(true)}
+          className="w-full text-xs border-gray-300 rounded py-1 pl-2 pr-8 shadow-sm focus:border-teal-500 focus:ring-teal-500"
+        />
+        <ChevronDown
+          className={`absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto bg-white border border-gray-200 rounded-md shadow-lg">
+          {filteredCustomers.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-gray-500">
+              {search ? '查無符合的客戶' : '尚無客戶資料'}
+            </div>
+          ) : (
+            filteredCustomers.map(c => (
+              <div
+                key={c.id}
+                onClick={() => handleSelect(c)}
+                className="px-3 py-2 cursor-pointer hover:bg-teal-50 transition-colors border-b border-gray-100 last:border-b-0"
+              >
+                <div className="text-sm font-medium text-gray-900">{c.name}</div>
+                <div className="text-xs text-gray-500 flex gap-2">
+                  {c.taxId && <span>統編：{c.taxId}</span>}
+                  {c.contact && <span>• {c.contact}</span>}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 
 
 // --- Main App ---
@@ -1259,12 +1338,36 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
     }
   };
 
-  // 智慧同步功能 (Smart Sync)
+  // 智慧同步功能 (Smart Sync) - 支援統編防重複
   const syncCustomerData = async (clientName, data) => {
     if (!clientName) return;
     try {
-      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), where("name", "==", clientName));
-      const querySnapshot = await getDocs(q);
+      let customerDoc = null;
+
+      // ✨ 優先用統編查詢（更準確，防止重複）
+      if (data.clientTaxId && data.clientTaxId.length === 8) {
+        const taxQuery = query(
+          collection(db, 'artifacts', appId, 'public', 'data', 'customers'),
+          where("taxId", "==", data.clientTaxId)
+        );
+        const taxSnapshot = await getDocs(taxQuery);
+        if (!taxSnapshot.empty) {
+          customerDoc = taxSnapshot.docs[0];
+        }
+      }
+
+      // 若統編沒找到，再用名稱查詢（向後相容）
+      if (!customerDoc) {
+        const nameQuery = query(
+          collection(db, 'artifacts', appId, 'public', 'data', 'customers'),
+          where("name", "==", clientName)
+        );
+        const nameSnapshot = await getDocs(nameQuery);
+        if (!nameSnapshot.empty) {
+          customerDoc = nameSnapshot.docs[0];
+        }
+      }
+
       const customerPayload = {
         name: data.clientName,
         taxId: data.clientTaxId || '',
@@ -1272,14 +1375,19 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
         phone: data.clientPhone || '',
         fax: data.clientFax || '',
         address: data.clientAddress || '',
-        email: data.clientEmail || ''
+        email: data.clientEmail || '',
+        updatedAt: serverTimestamp()
       };
 
-      if (!querySnapshot.empty) {
-        const customerDoc = querySnapshot.docs[0];
+      if (customerDoc) {
+        // 更新既有客戶
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', customerDoc.id), customerPayload);
       } else {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), customerPayload);
+        // 新增客戶
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), {
+          ...customerPayload,
+          createdAt: serverTimestamp()
+        });
       }
     } catch (e) { console.error("客戶同步失敗", e); }
   };
@@ -2597,14 +2705,22 @@ ${formData.companyContact || '張惟荏'}
                     <div className="flex justify-between items-end mb-2 border-b border-gray-200 pb-1">
                       <h3 className="font-bold text-gray-700">客戶資料 Customer</h3>
                       {!isPrintMode && (
-                        <select
-                          className="text-xs border-gray-300 rounded py-1 pl-2 pr-8 shadow-sm focus:border-teal-500 focus:ring-teal-500"
-                          onChange={handleClientSelect}
-                          defaultValue=""
-                        >
-                          <option value="" disabled>快速載入舊客戶...</option>
-                          {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                        <SearchableClientSelect
+                          customers={customers}
+                          onSelect={(c) => {
+                            setFormData(prev => ({
+                              ...prev,
+                              clientName: c.name,
+                              clientTaxId: c.taxId || '',
+                              clientContact: c.contact || '',
+                              clientPhone: c.phone || '',
+                              clientFax: c.fax || '',
+                              clientAddress: c.address || '',
+                              clientEmail: c.email || ''
+                            }));
+                          }}
+                          placeholder="搜尋客戶名稱或統編..."
+                        />
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
