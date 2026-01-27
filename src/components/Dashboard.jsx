@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, onSnapshot, deleteDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, onSnapshot, deleteDoc, doc, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import {
     Plus, Search, ChevronRight, ChevronDown, X,
-    ClipboardList, FileCheck, XCircle, Copy, Trash2
+    ClipboardList, FileCheck, XCircle, Copy, Trash2, Undo
 } from 'lucide-react';
 import { db, appId } from '../firebase';
 import { getNextQuoteNumber, formatDate, formatTimestamp } from '../utils/helpers';
@@ -32,6 +32,20 @@ const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
             docs.sort((a, b) => (b.updatedAt?.seconds || b.createdAt?.seconds || 0) - (a.updatedAt?.seconds || a.createdAt?.seconds || 0));
             setQuotes(docs);
             setLoading(false);
+
+            // 30天自動清理邏輯
+            const now = new Date();
+            docs.forEach(docData => {
+                if (docData.status === 'deleted' && docData.deletedAt) {
+                    const deletedDate = docData.deletedAt.toDate ? docData.deletedAt.toDate() : new Date(docData.deletedAt);
+                    const diffTime = Math.abs(now - deletedDate);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays > 30) {
+                        deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', docData.id))
+                            .catch(err => console.error('Auto-delete failed:', err));
+                    }
+                }
+            });
         });
 
         // 載入客戶列表用於篩選
@@ -44,15 +58,51 @@ const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
         return () => { unsubscribe(); unsubCustomers(); };
     }, []);
 
+    // 軟刪除 (移至回收桶)
     const handleDelete = async (e, id) => {
         e.stopPropagation();
         const quoteToDelete = quotes.find(q => q.id === id);
         if (!quoteToDelete) return;
 
-        if (confirm(`確定要刪除「${quoteToDelete.projectName || quoteToDelete.quoteNumber}」嗎？`)) {
+        if (confirm(`確定要將「${quoteToDelete.projectName || quoteToDelete.quoteNumber}」移至回收桶嗎？`)) {
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', id), {
+                    status: 'deleted',
+                    deletedAt: serverTimestamp()
+                });
+                triggerToast('報價單已移至回收桶');
+            } catch (err) {
+                console.error(err);
+                alert('刪除失敗');
+            }
+        }
+    };
+
+    // 還原功能
+    const handleRestore = async (e, id) => {
+        e.stopPropagation();
+        try {
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', id), {
+                status: 'draft', // 還原為草稿較安全
+                deletedAt: null
+            });
+            triggerToast('報價單已還原');
+        } catch (err) {
+            console.error(err);
+            alert('還原失敗');
+        }
+    };
+
+    // 永久刪除
+    const handlePermanentDelete = async (e, id) => {
+        e.stopPropagation();
+        const quoteToDelete = quotes.find(q => q.id === id);
+        if (!quoteToDelete) return;
+
+        if (confirm(`確定要永久刪除「${quoteToDelete.projectName || quoteToDelete.quoteNumber}」嗎？此動作無法復原！`)) {
             try {
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', id));
-                triggerToast('報價單已刪除');
+                triggerToast('報價單已永久刪除');
 
                 // --- 雲端同步刪除 (Fire and Forget) ---
                 fetch(N8N_SYNC_API_URL, {
@@ -68,7 +118,7 @@ const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
 
             } catch (err) {
                 console.error(err);
-                alert('刪除失敗');
+                alert('永久刪除失敗');
             }
         }
     };
@@ -131,6 +181,13 @@ const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
 
         if (statusFilter !== 'all') {
             result = result.filter(q => q.status === statusFilter);
+        } else {
+            // "全部" 狀態不應包含已刪除的，除非在回收桶分頁 (但這裡只處理 Filter 下拉選單)
+            // 邏輯修正：如果是在回收桶分頁，就不管 statusFilter (因為都是 deleted)
+            // 如果不是在回收桶分頁，預設濾掉 deleted
+            if (activeTab !== 'trash') {
+                result = result.filter(q => q.status !== 'deleted');
+            }
         }
 
         if (customerFilter !== 'all') {
@@ -196,6 +253,8 @@ const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
                 return (['draft', 'sent', 'confirmed'].includes(q.status) || !q.status);
             } else if (activeTab === 'cancelled') {
                 return q.status === 'cancelled';
+            } else if (activeTab === 'trash') {
+                return q.status === 'deleted';
             } else {
                 return q.status === 'ordered';
             }
@@ -207,6 +266,7 @@ const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
         const inProgress = displayedQuotes.filter(q => ['draft', 'sent', 'confirmed'].includes(q.status) || !q.status);
         const ordered = displayedQuotes.filter(q => q.status === 'ordered');
         const cancelled = displayedQuotes.filter(q => q.status === 'cancelled');
+        const deleted = displayedQuotes.filter(q => q.status === 'deleted');
 
         return {
             inProgressCount: inProgress.length,
@@ -215,7 +275,8 @@ const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
             orderedTotal: ordered.reduce((sum, q) => sum + (q.grandTotal || 0), 0),
             cancelledCount: cancelled.length,
             cancelledTotal: cancelled.reduce((sum, q) => sum + (q.grandTotal || 0), 0),
-            allTotal: displayedQuotes.reduce((sum, q) => sum + (q.grandTotal || 0), 0)
+            deletedCount: deleted.length,
+            allTotal: displayedQuotes.filter(q => q.status !== 'deleted').reduce((sum, q) => sum + (q.grandTotal || 0), 0) // 總合排除已刪除
         };
     }, [displayedQuotes]);
 
@@ -230,6 +291,7 @@ const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
         confirmed: { label: '已確認', color: 'bg-indigo-50 text-indigo-600 border-indigo-200' },
         ordered: { label: '已轉訂單', color: 'bg-green-50 text-green-600 border-green-200' },
         cancelled: { label: '已取消', color: 'bg-red-50 text-red-600 border-red-200' },
+        deleted: { label: '已刪除', color: 'bg-gray-200 text-gray-500 border-gray-300' },
     };
 
     const clearFilters = () => {
@@ -419,8 +481,17 @@ const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                         }`}
                 >
-                    <XCircle className="w-4 h-4 mr-2" />
                     已取消 ({stats.cancelledCount})
+                </button>
+                <button
+                    onClick={() => setActiveTab('trash')}
+                    className={`flex items-center py-2 px-6 border-b-2 font-medium text-sm transition-colors ${activeTab === 'trash'
+                        ? 'border-gray-600 text-gray-700'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    回收桶 ({stats.deletedCount})
                 </button>
             </div>
 
@@ -494,20 +565,41 @@ const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
                                             </td>
                                             <td className="px-6 py-4 text-right text-sm font-medium">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <button
-                                                        onClick={(e) => handleDuplicate(e, quote)}
-                                                        className="text-gray-400 hover:text-teal-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
-                                                        title="複製此報價單"
-                                                    >
-                                                        <Copy className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => handleDelete(e, quote.id)}
-                                                        className="text-gray-400 hover:text-red-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
-                                                        title="刪除"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {status.label === '已刪除' ? (
+                                                        <>
+                                                            <button
+                                                                onClick={(e) => handleRestore(e, quote.id)}
+                                                                className="text-gray-400 hover:text-green-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                                                                title="還原"
+                                                            >
+                                                                <Undo className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => handlePermanentDelete(e, quote.id)}
+                                                                className="text-gray-400 hover:text-red-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                                                                title="永久刪除"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                onClick={(e) => handleDuplicate(e, quote)}
+                                                                className="text-gray-400 hover:text-teal-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                                                                title="複製此報價單"
+                                                            >
+                                                                <Copy className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => handleDelete(e, quote.id)}
+                                                                className="text-gray-400 hover:text-red-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                                                                title="移至回收桶"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
