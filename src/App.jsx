@@ -1413,16 +1413,19 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
   };
 
   const save = async (silent = false, updates = {}) => {
+    // 1. UI 防呆：如果是儲存中，或(不是新單且沒修改)，則不執行
+    const isNewQuote = !quoteId;
+    if (saving) return; // Prevent double submit
+    if (!isNewQuote && !isDirty && !silent) return; // Prevent unnecessary save
+
     if (!silent) setSaving(true);
-    // const payload = { ...formData, ...updates, subtotal, tax, grandTotal, updatedAt: serverTimestamp() }; // 移到下方動態生成
 
     try {
-      const isNewQuote = !quoteId;
       let newId = quoteId;
       let finalQuoteNumber = formData.quoteNumber;
 
       if (isNewQuote) {
-        // ✨✨✨ 新增模式：使用 Transaction 原子性生成單號 ✨✨✨
+        // ✨✨✨ 新增模式：使用 Transaction 原子性生成單號 + 防撞檢查 ✨✨✨
         await runTransaction(db, async (transaction) => {
           // 1. 準備計數器 Ref
           const counterRef = doc(db, 'artifacts', appId, 'public', 'data', 'sys_counters', 'quotations');
@@ -1436,46 +1439,68 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
 
           if (counterDoc.exists()) {
             const data = counterDoc.data();
-            // 如果跨月了，重置為 1 (這裡假設 sequence 是跨月不重置，如果要跨月重置需加邏輯，這裡依據舊邏輯似乎是延續的，但通常會重置。為了安全先延續舊邏輯：只看數字)
-            // 修正：舊邏輯是 J-YY-MMXXX，並沒有跨月重置的明確代碼，只是取最後一筆+1。
-            // 這裡我們實作一個更安全的邏輯：如果是同一個月，則累加；不同月則重置(可選)。
-            // 為了保持與舊資料相容，我們先讀取 currentSeq。
-
-            // 檢查是否同一個月 (可選，若不需要跨月重置，直接加)
-            // 這裡簡單實作：直接 +1，確保不重複即可
+            // 讀取當前序號並 +1
             const currentSeq = data.currentSeq || 0;
             nextSeq = currentSeq + 1;
           } else {
-            // 如果計數器不存在（第一次上線），先去撈一次舊資料的最大值來初始化 (Fallback)
-            // 避免突然從 001 開始造成重複
+            // Fallback: 如果計數器不存在，從現有資料中撈取最大值 (修正字串排序問題)
+            // 不使用 limit(1) 因為字串排序 999 > 1000
+            // 改為撈取最近一批 (例如 100 筆) 並手動比對數字大小
             const q = query(
               collection(db, 'artifacts', appId, 'public', 'data', 'quotations'),
-              orderBy('quoteNumber', 'desc'),
-              limit(1)
+              orderBy('createdAt', 'desc'), // 改用時間排序，找最新的
+              limit(50)
             );
             const snapshot = await getDocs(q);
-            if (!snapshot.empty) {
-              const lastId = snapshot.docs[0].data().quoteNumber;
-              // 嘗試解析 J-YY-MMXXX
-              if (lastId && lastId.match(/J-\d{2}-\d{2}\d{3}/)) {
-                const baseId = lastId.split('-V')[0]; // 去除版本號
-                const lastSeqStr = baseId.slice(-3); // 取後三碼
-                const lastSeqNum = parseInt(lastSeqStr, 10);
-                if (!isNaN(lastSeqNum)) {
-                  nextSeq = lastSeqNum + 1;
+
+            let maxSeq = 0;
+            snapshot.forEach(doc => {
+              const qNum = doc.data().quoteNumber;
+              // 解析 J-YY-MMXXX...
+              if (qNum && qNum.startsWith(prefix)) {
+                // 取出前綴之後的部分 (即流水號)
+                const seqPart = qNum.replace(prefix, '').split('-V')[0];
+                const seqNum = parseInt(seqPart, 10);
+                if (!isNaN(seqNum) && seqNum > maxSeq) {
+                  maxSeq = seqNum;
                 }
               }
+            });
+            nextSeq = maxSeq + 1;
+          }
+
+          // 2. 防撞迴圈：確保此號碼真的沒被用過
+          let isCollision = true;
+          while (isCollision) {
+            // 格式化單號 (補零至3碼，若超過3碼則不補)
+            const seqStr = String(nextSeq).padStart(3, '0');
+            finalQuoteNumber = `${prefix}${seqStr}`;
+
+            // 檢查是否已存在 (Direct Lookup)
+            const checkQuery = query(
+              collection(db, 'artifacts', appId, 'public', 'data', 'quotations'),
+              where('quoteNumber', '==', finalQuoteNumber)
+            );
+            const checkSnap = await getDocs(checkQuery); // 注意：Transaction 內最好用 transaction.get，但 query 不支援直接 transaction.get 集合。
+            // 替代方案：直接以此 ID 讀取 (如果我們可以預測 ID)。但這裡是 Auto ID。
+            // 退而求其次：相信 Sequence，但在寫入時計數器會鎖定。
+            // 這裡做的 `getDocs` 是在 Transaction 外部 (雖然語法上在內，但 Firestore SDK 限制 query 不能綁定 transaction，除非是 aggregation)。
+            // 修正策略：Transaction 主要保護 `sys_counters`。只要 `sys_counters` 鎖住，這裡的 `nextSeq` 就是獨佔的。
+            // 上面的 while 迴圈是為了防止 `sys_counters` 與實際資料不一致的情況 (例如手動刪改過 DB)。
+
+            if (checkSnap.empty) {
+              isCollision = false;
+            } else {
+              // 撞號了 (counter 落後於實際資料)，自動 +1 重試
+              console.warn(`碰撞偵測：${finalQuoteNumber} 已存在，嘗試下一個...`);
+              nextSeq++;
             }
           }
 
-          // 格式化單號
-          const seqStr = String(nextSeq).padStart(3, '0');
-          finalQuoteNumber = `${prefix}${seqStr}`;
-
-          // 2. 寫回計數器
+          // 3. 寫回計數器 (更新為最新可用的)
           transaction.set(counterRef, { currentSeq: nextSeq, lastUpdated: serverTimestamp() }, { merge: true });
 
-          // 3. 建立新報價單
+          // 4. 建立新報價單
           const newQuoteRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'));
           newId = newQuoteRef.id;
 
@@ -2536,7 +2561,7 @@ ${formData.companyContact || '張惟荏'}
                   <><Send className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">寄出</span></>
                 )}
               </button>
-              <button onClick={() => save()} disabled={saving} className="btn-primary text-xs sm:text-sm">
+              <button onClick={() => save()} disabled={saving || (!quoteId ? false : !isDirty)} className={`btn-primary text-xs sm:text-sm ${(!quoteId ? false : !isDirty) ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <Save className="w-4 h-4 sm:mr-1" /> {saving ? '儲存中...' : '儲存'}
               </button>
             </div>
