@@ -195,7 +195,7 @@ const Dashboard = ({ user, triggerToast, onEdit, onCreate, onDuplicate }) => {
         }
 
         return result;
-    }, [quotes, searchTerm, statusFilter, customerFilter]);
+    }, [quotes, searchTerm, statusFilter, customerFilter, activeTab]);
 
     // 2. 第二階段：摺疊 (Group) 並保留歷史資料
     const displayedQuotes = useMemo(() => {
