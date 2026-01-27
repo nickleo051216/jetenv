@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    ArrowLeft, Copy, Printer, Loader2, Send, Save, X, ListPlus, Plus
+  ArrowLeft, Copy, Printer, Loader2, Send, Save, X, ListPlus, Plus, Trash2
 } from 'lucide-react';
 import {
-    collection, onSnapshot, doc, getDocs, addDoc, updateDoc,
-    runTransaction, query, where, orderBy, limit, serverTimestamp
+  collection, onSnapshot, doc, getDocs, addDoc, updateDoc,
+  runTransaction, query, where, orderBy, limit, serverTimestamp
 } from 'firebase/firestore';
 
 import { db, appId } from '../firebase';
 import {
-    generateQuoteNumber, formatDate, getNextQuoteNumber
+  generateQuoteNumber, formatDate, getNextQuoteNumber
 } from '../utils/helpers';
 import {
-    DEFAULT_LOGO_PATH, STAMP_BASE64, NOTE_TEMPLATES,
-    N8N_SYNC_API_URL, N8N_EMAIL_API_URL, N8N_MOEA_API_URL,
-    PAYMENT_METHODS, PAYMENT_TERMS
+  DEFAULT_LOGO_PATH, STAMP_BASE64, NOTE_TEMPLATES,
+  N8N_SYNC_API_URL, N8N_EMAIL_API_URL, N8N_MOEA_API_URL,
+  PAYMENT_METHODS, PAYMENT_TERMS
 } from '../constants';
 
 import Spinner from './Spinner';
@@ -24,428 +24,428 @@ import SmartSelect from './SmartSelect';
 import NoteSelector from './NoteSelector';
 
 const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, onPrintToggle, isPrintMode }) => {
-    const [loading, setLoading] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [sending, setSending] = useState(false); // 寄送狀態
-    const [sendingMessage, setSendingMessage] = useState(''); // Loading 訊息
-    const [logoPreview, setLogoPreview] = useState(DEFAULT_LOGO_PATH);
-    const [stampPreview, setStampPreview] = useState(STAMP_BASE64);
-    const [customers, setCustomers] = useState([]);
-    const [products, setProducts] = useState([]);
-    const [isDirty, setIsDirty] = useState(false); // ✨ 新增 Dirty Check 狀態
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false); // 寄送狀態
+  const [sendingMessage, setSendingMessage] = useState(''); // Loading 訊息
+  const [logoPreview, setLogoPreview] = useState(DEFAULT_LOGO_PATH);
+  const [stampPreview, setStampPreview] = useState(STAMP_BASE64);
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [isDirty, setIsDirty] = useState(false); // ✨ 新增 Dirty Check 狀態
 
-    const [formData, setFormData] = useState({
-        quoteNumber: generateQuoteNumber(), // 暫時用亂數，useEffect 會覆蓋它
-        projectName: '',
-        status: 'draft',
-        version: 1,
-        date: formatDate(new Date()),
-        validUntil: formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
-        // 預設公司聯絡資訊
-        companyContact: '張惟荏',
-        companyPhone: '02-6609-5888 #103',
-        clientName: '',
-        clientTaxId: '',
-        clientContact: '',
-        clientPhone: '',
-        clientFax: '',
-        clientAddress: '',
-        clientEmail: '',
-        items: [
-            { id: Date.now(), name: '顧問諮詢服務', spec: '', unit: '式', price: 0, qty: 1, frequency: '', note: '' }
-        ],
-        paymentMethod: '匯款',
-        paymentTerms: '驗收後並開立發票 30 天內付款',
-        notes: NOTE_TEMPLATES[0].content,
-        // 表格欄位寬度設定 (百分比)
-        columnWidths: {
-            name: 18,    // 項目名稱
-            spec: 42,    // 規格描述 (加大)
-            frequency: 5, // 頻率
-            unit: 5,     // 單位
-            qty: 5,      // 數量
-            price: 8,    // 單價
-            total: 10    // 複價
-        },
-        quoteNumber: quoteId ? '' : '(系統自動生成)' // ✨ 預設顯示自動生成
-    });
+  const [formData, setFormData] = useState({
+    quoteNumber: generateQuoteNumber(), // 暫時用亂數，useEffect 會覆蓋它
+    projectName: '',
+    status: 'draft',
+    version: 1,
+    date: formatDate(new Date()),
+    validUntil: formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
+    // 預設公司聯絡資訊
+    companyContact: '張惟荏',
+    companyPhone: '02-6609-5888 #103',
+    clientName: '',
+    clientTaxId: '',
+    clientContact: '',
+    clientPhone: '',
+    clientFax: '',
+    clientAddress: '',
+    clientEmail: '',
+    items: [
+      { id: Date.now(), name: '顧問諮詢服務', spec: '', unit: '式', price: 0, qty: 1, frequency: '', note: '' }
+    ],
+    paymentMethod: '匯款',
+    paymentTerms: '驗收後並開立發票 30 天內付款',
+    notes: NOTE_TEMPLATES[0].content,
+    // 表格欄位寬度設定 (百分比)
+    columnWidths: {
+      name: 18,    // 項目名稱
+      spec: 42,    // 規格描述 (加大)
+      frequency: 5, // 頻率
+      unit: 5,     // 單位
+      qty: 5,      // 數量
+      price: 8,    // 單價
+      total: 10    // 複價
+    },
+    quoteNumber: quoteId ? '' : '(系統自動生成)' // ✨ 預設顯示自動生成
+  });
 
-    // --- 雲端同步邏輯 (n8n Webhook) ---
-    const handleCloudSync = async (mode = 'update') => {
-        try {
-            const quoteHtml = capturePrintHtml();
-            const response = await fetch(N8N_SYNC_API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    mode, // 'update' 或 'create'
-                    quoteNumber: formData.quoteNumber,
-                    projectName: formData.projectName,
-                    filename: `${formData.quoteNumber}-${formData.projectName}`,
-                    clientName: formData.clientName,
-                    grandTotal: grandTotal,
-                    quoteHtml
-                })
-            });
-            const data = await response.json().catch(() => ({}));
-            return response.ok && data.status === 'success';
-        } catch (e) {
-            console.error('雲端同步失敗:', e);
-            return false;
+  // --- 雲端同步邏輯 (n8n Webhook) ---
+  const handleCloudSync = async (mode = 'update') => {
+    try {
+      const quoteHtml = capturePrintHtml();
+      const response = await fetch(N8N_SYNC_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode, // 'update' 或 'create'
+          quoteNumber: formData.quoteNumber,
+          projectName: formData.projectName,
+          filename: `${formData.quoteNumber}-${formData.projectName}`,
+          clientName: formData.clientName,
+          grandTotal: grandTotal,
+          quoteHtml
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      return response.ok && data.status === 'success';
+    } catch (e) {
+      console.error('雲端同步失敗:', e);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    const unsubC = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), s => setCustomers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubP = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'products'), s => setProducts(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return () => { unsubC(); unsubP(); };
+  }, []);
+
+  useEffect(() => {
+    if (quoteId) {
+      setLoading(true);
+      const unsub = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', quoteId), (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          setFormData(prev => ({ ...prev, ...data }));
         }
-    };
+        setLoading(false);
+      });
+      return () => unsub();
+    }
+  }, [quoteId]);
 
-    useEffect(() => {
-        const unsubC = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), s => setCustomers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const unsubP = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'products'), s => setProducts(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        return () => { unsubC(); unsubP(); };
-    }, []);
+  useEffect(() => {
+    if (formData.quoteNumber) {
+      const fileName = `${formData.quoteNumber}_${formData.clientName || '客戶'}_${formData.projectName || '專案'}`;
+      document.title = fileName;
+    }
+    return () => { document.title = '傑太環境工程報價系統'; }
+  }, [formData.quoteNumber, formData.clientName, formData.projectName]);
 
-    useEffect(() => {
-        if (quoteId) {
-            setLoading(true);
-            const unsub = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', quoteId), (doc) => {
-                if (doc.exists()) {
-                    const data = doc.data();
-                    setFormData(prev => ({ ...prev, ...data }));
-                }
-                setLoading(false);
-            });
-            return () => unsub();
+  const subtotal = useMemo(() => formData.items.reduce((sum, item) => sum + (item.price * item.qty), 0), [formData.items]);
+  const tax = Math.round(subtotal * 0.05);
+  const grandTotal = subtotal + tax;
+
+  // ✨ 監聽表單變更，設定 Dirty 狀態
+  useEffect(() => {
+    if (formData && !loading) {
+      // 這裡簡單處理：只要不是初始狀態就視為 Dirty
+      // 注意：這裡假設 loading 結束後 formData 已被正確設定
+      if (quoteId) { // 編輯模式
+        setIsDirty(true);
+      } else { // 新增模式
+        // 檢查是否與初始狀態不同 (這裡簡化判斷，只要有輸入就算)
+        if (formData.clientName || formData.items.length > 1 || formData.items[0].name !== '顧問諮詢服務') {
+          setIsDirty(true);
         }
-    }, [quoteId]);
+      }
+    }
+  }, [formData, subtotal, tax, grandTotal]);
 
-    useEffect(() => {
-        if (formData.quoteNumber) {
-            const fileName = `${formData.quoteNumber}_${formData.clientName || '客戶'}_${formData.projectName || '專案'}`;
-            document.title = fileName;
-        }
-        return () => { document.title = '傑太環境工程報價系統'; }
-    }, [formData.quoteNumber, formData.clientName, formData.projectName]);
+  // 修正初始載入造成的 Dirty
+  useEffect(() => { setIsDirty(false); }, [quoteId]); // 切換單號時重置
 
-    const subtotal = useMemo(() => formData.items.reduce((sum, item) => sum + (item.price * item.qty), 0), [formData.items]);
-    const tax = Math.round(subtotal * 0.05);
-    const grandTotal = subtotal + tax;
+  const handleItemChange = (id, field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.map(item => item.id === id ? { ...item, [field]: value } : item)
+    }));
+  };
 
-    // ✨ 監聽表單變更，設定 Dirty 狀態
-    useEffect(() => {
-        if (formData && !loading) {
-            // 這裡簡單處理：只要不是初始狀態就視為 Dirty
-            // 注意：這裡假設 loading 結束後 formData 已被正確設定
-            if (quoteId) { // 編輯模式
-                setIsDirty(true);
-            } else { // 新增模式
-                // 檢查是否與初始狀態不同 (這裡簡化判斷，只要有輸入就算)
-                if (formData.clientName || formData.items.length > 1 || formData.items[0].name !== '顧問諮詢服務') {
-                    setIsDirty(true);
-                }
-            }
-        }
-    }, [formData, subtotal, tax, grandTotal]);
-
-    // 修正初始載入造成的 Dirty
-    useEffect(() => { setIsDirty(false); }, [quoteId]); // 切換單號時重置
-
-    const handleItemChange = (id, field, value) => {
-        setFormData(prev => ({
-            ...prev,
-            items: prev.items.map(item => item.id === id ? { ...item, [field]: value } : item)
-        }));
+  const addItem = (product = null) => {
+    const newItem = product ? {
+      id: Date.now(),
+      name: product.name,
+      spec: product.spec || '',
+      unit: product.unit || '式',
+      price: product.price || 0,
+      qty: 1,
+      frequency: '',
+      note: '',
+      nameBoxWidth: null,   // 項目名稱欄位寬度 (null = 自動)
+      nameBoxHeight: null,  // 項目名稱欄位高度 (null = 自動)
+      specBoxWidth: null,   // 規格描述欄位寬度 (null = 自動)
+      specBoxHeight: null   // 規格描述欄位高度 (null = 自動)
+    } : {
+      id: Date.now(),
+      name: '', spec: '', unit: '式', price: 0, qty: 1, frequency: '', note: '',
+      nameBoxWidth: null,
+      nameBoxHeight: null,
+      specBoxWidth: null,
+      specBoxHeight: null
     };
+    setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
+  };
 
-    const addItem = (product = null) => {
-        const newItem = product ? {
-            id: Date.now(),
-            name: product.name,
-            spec: product.spec || '',
-            unit: product.unit || '式',
-            price: product.price || 0,
-            qty: 1,
-            frequency: '',
-            note: '',
-            nameBoxWidth: null,   // 項目名稱欄位寬度 (null = 自動)
-            nameBoxHeight: null,  // 項目名稱欄位高度 (null = 自動)
-            specBoxWidth: null,   // 規格描述欄位寬度 (null = 自動)
-            specBoxHeight: null   // 規格描述欄位高度 (null = 自動)
-        } : {
-            id: Date.now(),
-            name: '', spec: '', unit: '式', price: 0, qty: 1, frequency: '', note: '',
-            nameBoxWidth: null,
-            nameBoxHeight: null,
-            specBoxWidth: null,
-            specBoxHeight: null
-        };
-        setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
-    };
+  const handleProductSelect = (e) => {
+    const pid = e.target.value;
+    if (!pid) return;
+    const p = products.find(prod => prod.id === pid);
+    if (p) addItem(p);
+    e.target.value = "";
+  };
 
-    const handleProductSelect = (e) => {
-        const pid = e.target.value;
-        if (!pid) return;
-        const p = products.find(prod => prod.id === pid);
-        if (p) addItem(p);
-        e.target.value = "";
-    };
+  const handleClientSelect = (e) => {
+    const c = customers.find(x => x.id === e.target.value);
+    if (c) {
+      setFormData(prev => ({
+        ...prev,
+        clientName: c.name,
+        clientTaxId: c.taxId || '',
+        clientContact: c.contact || '',
+        clientPhone: c.phone || '',
+        clientFax: c.fax || '',
+        clientAddress: c.address || '',
+        clientEmail: c.email || ''
+      }));
+    }
+  };
 
-    const handleClientSelect = (e) => {
-        const c = customers.find(x => x.id === e.target.value);
-        if (c) {
-            setFormData(prev => ({
-                ...prev,
-                clientName: c.name,
-                clientTaxId: c.taxId || '',
-                clientContact: c.contact || '',
-                clientPhone: c.phone || '',
-                clientFax: c.fax || '',
-                clientAddress: c.address || '',
-                clientEmail: c.email || ''
-            }));
-        }
-    };
+  const handleImageUpload = (e, setter) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setter(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
-    const handleImageUpload = (e, setter) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setter(reader.result);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
+  // 智慧同步功能 (Smart Sync) - 支援統編防重複
+  const syncCustomerData = async (clientName, data) => {
+    if (!clientName) return;
+    try {
+      let customerDoc = null;
 
-    // 智慧同步功能 (Smart Sync) - 支援統編防重複
-    const syncCustomerData = async (clientName, data) => {
-        if (!clientName) return;
-        try {
-            let customerDoc = null;
-
-            // ✨ 優先用統編查詢（更準確，防止重複）
-            if (data.clientTaxId && data.clientTaxId.length === 8) {
-                const taxQuery = query(
-                    collection(db, 'artifacts', appId, 'public', 'data', 'customers'),
-                    where("taxId", "==", data.clientTaxId)
-                );
-                const taxSnapshot = await getDocs(taxQuery);
-                if (!taxSnapshot.empty) {
-                    customerDoc = taxSnapshot.docs[0];
-                }
-            }
-
-            // 若統編沒找到，再用名稱查詢（向後相容）
-            if (!customerDoc) {
-                const nameQuery = query(
-                    collection(db, 'artifacts', appId, 'public', 'data', 'customers'),
-                    where("name", "==", clientName)
-                );
-                const nameSnapshot = await getDocs(nameQuery);
-                if (!nameSnapshot.empty) {
-                    customerDoc = nameSnapshot.docs[0];
-                }
-            }
-
-            const customerPayload = {
-                name: data.clientName,
-                taxId: data.clientTaxId || '',
-                contact: data.clientContact || '',
-                phone: data.clientPhone || '',
-                fax: data.clientFax || '',
-                address: data.clientAddress || '',
-                email: data.clientEmail || '',
-                updatedAt: serverTimestamp()
-            };
-
-            if (customerDoc) {
-                // 更新既有客戶
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', customerDoc.id), customerPayload);
-            } else {
-                // 新增客戶
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), {
-                    ...customerPayload,
-                    createdAt: serverTimestamp()
-                });
-            }
-        } catch (e) { console.error("客戶同步失敗", e); }
-    };
-
-    const syncProductData = async (items) => {
-        if (!items || items.length === 0) return;
-        try {
-            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'products'));
-            const querySnapshot = await getDocs(q);
-            const existingProducts = querySnapshot.docs.map(d => d.data().name);
-            for (const item of items) {
-                if (item.name && !existingProducts.includes(item.name)) {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
-                        name: item.name,
-                        spec: item.spec || '',
-                        unit: item.unit || '式',
-                        price: Number(item.price) || 0
-                    });
-                    existingProducts.push(item.name);
-                }
-            }
-        } catch (e) { console.error("產品同步失敗", e); }
-    };
-
-    const save = async (silent = false, updates = {}) => {
-        // 1. UI 防呆：如果是儲存中，或(不是新單且沒修改)，則不執行
-        const isNewQuote = !quoteId;
-        if (saving) return; // Prevent double submit
-        if (!isNewQuote && !isDirty && !silent) return; // Prevent unnecessary save
-
-        if (!silent) setSaving(true);
-
-        try {
-            let newId = quoteId;
-            let finalQuoteNumber = formData.quoteNumber;
-
-            if (isNewQuote) {
-                // ✨✨✨ 新增模式：使用 Transaction 原子性生成單號 + 防撞檢查 ✨✨✨
-                await runTransaction(db, async (transaction) => {
-                    // 1. 準備計數器 Ref
-                    const counterRef = doc(db, 'artifacts', appId, 'public', 'data', 'sys_counters', 'quotations');
-                    const counterDoc = await transaction.get(counterRef);
-
-                    let nextSeq = 1;
-                    const now = new Date();
-                    const yy = String(now.getFullYear()).slice(-2);
-                    const mm = String(now.getMonth() + 1).padStart(2, '0');
-                    const prefix = `J-${yy}-${mm}`;
-
-                    if (counterDoc.exists()) {
-                        const data = counterDoc.data();
-                        // 讀取當前序號並 +1
-                        const currentSeq = data.currentSeq || 0;
-                        nextSeq = currentSeq + 1;
-                    } else {
-                        // Fallback: 如果計數器不存在，從現有資料中撈取最大值 (修正字串排序問題)
-                        // 不使用 limit(1) 因為字串排序 999 > 1000
-                        // 改為撈取最近一批 (例如 100 筆) 並手動比對數字大小
-                        const q = query(
-                            collection(db, 'artifacts', appId, 'public', 'data', 'quotations'),
-                            orderBy('createdAt', 'desc'), // 改用時間排序，找最新的
-                            limit(50)
-                        );
-                        const snapshot = await getDocs(q);
-
-                        let maxSeq = 0;
-                        snapshot.forEach(doc => {
-                            const qNum = doc.data().quoteNumber;
-                            // 解析 J-YY-MMXXX...
-                            if (qNum && qNum.startsWith(prefix)) {
-                                // 取出前綴之後的部分 (即流水號)
-                                const seqPart = qNum.replace(prefix, '').split('-V')[0];
-                                const seqNum = parseInt(seqPart, 10);
-                                if (!isNaN(seqNum) && seqNum > maxSeq) {
-                                    maxSeq = seqNum;
-                                }
-                            }
-                        });
-                        nextSeq = maxSeq + 1;
-                    }
-
-                    // 2. 防撞迴圈：確保此號碼真的沒被用過
-                    let isCollision = true;
-                    while (isCollision) {
-                        // 格式化單號 (補零至3碼，若超過3碼則不補)
-                        const seqStr = String(nextSeq).padStart(3, '0');
-                        finalQuoteNumber = `${prefix}${seqStr}`;
-
-                        // 檢查是否已存在 (Direct Lookup)
-                        const checkQuery = query(
-                            collection(db, 'artifacts', appId, 'public', 'data', 'quotations'),
-                            where('quoteNumber', '==', finalQuoteNumber)
-                        );
-                        const checkSnap = await getDocs(checkQuery);
-
-                        if (checkSnap.empty) {
-                            isCollision = false;
-                        } else {
-                            // 撞號了 (counter 落後於實際資料)，自動 +1 重試
-                            console.warn(`碰撞偵測：${finalQuoteNumber} 已存在，嘗試下一個...`);
-                            nextSeq++;
-                        }
-                    }
-
-                    // 3. 寫回計數器 (更新為最新可用的)
-                    transaction.set(counterRef, { currentSeq: nextSeq, lastUpdated: serverTimestamp() }, { merge: true });
-
-                    // 4. 建立新報價單
-                    const newQuoteRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'));
-                    newId = newQuoteRef.id;
-
-                    const payload = {
-                        ...formData,
-                        ...updates,
-                        quoteNumber: finalQuoteNumber, // 寫入正確單號
-                        subtotal, tax, grandTotal,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                    };
-
-                    transaction.set(newQuoteRef, payload);
-                });
-
-                // Transaction 成功後，更新本地狀態
-                if (!quoteId) setActiveQuoteId(newId);
-                setFormData(prev => ({ ...prev, quoteNumber: finalQuoteNumber }));
-
-            } else {
-                // ✨ 既有模式：直接更新
-                const payload = { ...formData, ...updates, subtotal, tax, grandTotal, updatedAt: serverTimestamp() };
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', quoteId), payload);
-            }
-
-            await syncCustomerData(updates.clientName || formData.clientName, { ...formData, ...updates });
-            await syncProductData(formData.items);
-
-            setIsDirty(false); // ✨ 儲存成功，清除 Dirty 狀態
-
-            if (!silent) {
-                // 分成 'create' (新建立) 與 'update' (覆蓋更新)
-                const syncSuccess = await handleCloudSync(isNewQuote ? 'create' : 'update');
-                triggerToast(
-                    syncSuccess ? '儲存成功，並已同步至雲端' : '儲存成功，但雲端同步失敗',
-                    syncSuccess ? 'success' : 'error'
-                );
-            }
-        } catch (e) {
-            console.error("儲存失敗:", e);
-            alert(`儲存失敗: ${e.message}`);
-        }
-        if (!silent) setSaving(false);
-    };
-
-    const versionUp = async () => {
-        if (!confirm('確定要建立新版本嗎？')) return;
-        setSaving(true);
-        const newVer = formData.version + 1;
-        const newNumber = formData.quoteNumber.includes('-V')
-            ? formData.quoteNumber.replace(/-V\d+$/, `-V${newVer}`)
-            : `${formData.quoteNumber}-V${newVer}`;
-
-        const payload = {
-            ...formData,
-            quoteNumber: newNumber,
-            version: newVer,
-            status: 'draft',
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-            subtotal, tax, grandTotal
-        };
-
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'), payload);
-        const syncSuccess = await handleCloudSync('version');
-        triggerToast(
-            syncSuccess ? '已建立新版本，並已同步至雲端' : '已建立新版本，但雲端同步失敗',
-            syncSuccess ? 'success' : 'error'
+      // ✨ 優先用統編查詢（更準確，防止重複）
+      if (data.clientTaxId && data.clientTaxId.length === 8) {
+        const taxQuery = query(
+          collection(db, 'artifacts', appId, 'public', 'data', 'customers'),
+          where("taxId", "==", data.clientTaxId)
         );
-        setSaving(false);
-        onBack();
+        const taxSnapshot = await getDocs(taxQuery);
+        if (!taxSnapshot.empty) {
+          customerDoc = taxSnapshot.docs[0];
+        }
+      }
+
+      // 若統編沒找到，再用名稱查詢（向後相容）
+      if (!customerDoc) {
+        const nameQuery = query(
+          collection(db, 'artifacts', appId, 'public', 'data', 'customers'),
+          where("name", "==", clientName)
+        );
+        const nameSnapshot = await getDocs(nameQuery);
+        if (!nameSnapshot.empty) {
+          customerDoc = nameSnapshot.docs[0];
+        }
+      }
+
+      const customerPayload = {
+        name: data.clientName,
+        taxId: data.clientTaxId || '',
+        contact: data.clientContact || '',
+        phone: data.clientPhone || '',
+        fax: data.clientFax || '',
+        address: data.clientAddress || '',
+        email: data.clientEmail || '',
+        updatedAt: serverTimestamp()
+      };
+
+      if (customerDoc) {
+        // 更新既有客戶
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'customers', customerDoc.id), customerPayload);
+      } else {
+        // 新增客戶
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'customers'), {
+          ...customerPayload,
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (e) { console.error("客戶同步失敗", e); }
+  };
+
+  const syncProductData = async (items) => {
+    if (!items || items.length === 0) return;
+    try {
+      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'products'));
+      const querySnapshot = await getDocs(q);
+      const existingProducts = querySnapshot.docs.map(d => d.data().name);
+      for (const item of items) {
+        if (item.name && !existingProducts.includes(item.name)) {
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
+            name: item.name,
+            spec: item.spec || '',
+            unit: item.unit || '式',
+            price: Number(item.price) || 0
+          });
+          existingProducts.push(item.name);
+        }
+      }
+    } catch (e) { console.error("產品同步失敗", e); }
+  };
+
+  const save = async (silent = false, updates = {}) => {
+    // 1. UI 防呆：如果是儲存中，或(不是新單且沒修改)，則不執行
+    const isNewQuote = !quoteId;
+    if (saving) return; // Prevent double submit
+    if (!isNewQuote && !isDirty && !silent) return; // Prevent unnecessary save
+
+    if (!silent) setSaving(true);
+
+    try {
+      let newId = quoteId;
+      let finalQuoteNumber = formData.quoteNumber;
+
+      if (isNewQuote) {
+        // ✨✨✨ 新增模式：使用 Transaction 原子性生成單號 + 防撞檢查 ✨✨✨
+        await runTransaction(db, async (transaction) => {
+          // 1. 準備計數器 Ref
+          const counterRef = doc(db, 'artifacts', appId, 'public', 'data', 'sys_counters', 'quotations');
+          const counterDoc = await transaction.get(counterRef);
+
+          let nextSeq = 1;
+          const now = new Date();
+          const yy = String(now.getFullYear()).slice(-2);
+          const mm = String(now.getMonth() + 1).padStart(2, '0');
+          const prefix = `J-${yy}-${mm}`;
+
+          if (counterDoc.exists()) {
+            const data = counterDoc.data();
+            // 讀取當前序號並 +1
+            const currentSeq = data.currentSeq || 0;
+            nextSeq = currentSeq + 1;
+          } else {
+            // Fallback: 如果計數器不存在，從現有資料中撈取最大值 (修正字串排序問題)
+            // 不使用 limit(1) 因為字串排序 999 > 1000
+            // 改為撈取最近一批 (例如 100 筆) 並手動比對數字大小
+            const q = query(
+              collection(db, 'artifacts', appId, 'public', 'data', 'quotations'),
+              orderBy('createdAt', 'desc'), // 改用時間排序，找最新的
+              limit(50)
+            );
+            const snapshot = await getDocs(q);
+
+            let maxSeq = 0;
+            snapshot.forEach(doc => {
+              const qNum = doc.data().quoteNumber;
+              // 解析 J-YY-MMXXX...
+              if (qNum && qNum.startsWith(prefix)) {
+                // 取出前綴之後的部分 (即流水號)
+                const seqPart = qNum.replace(prefix, '').split('-V')[0];
+                const seqNum = parseInt(seqPart, 10);
+                if (!isNaN(seqNum) && seqNum > maxSeq) {
+                  maxSeq = seqNum;
+                }
+              }
+            });
+            nextSeq = maxSeq + 1;
+          }
+
+          // 2. 防撞迴圈：確保此號碼真的沒被用過
+          let isCollision = true;
+          while (isCollision) {
+            // 格式化單號 (補零至3碼，若超過3碼則不補)
+            const seqStr = String(nextSeq).padStart(3, '0');
+            finalQuoteNumber = `${prefix}${seqStr}`;
+
+            // 檢查是否已存在 (Direct Lookup)
+            const checkQuery = query(
+              collection(db, 'artifacts', appId, 'public', 'data', 'quotations'),
+              where('quoteNumber', '==', finalQuoteNumber)
+            );
+            const checkSnap = await getDocs(checkQuery);
+
+            if (checkSnap.empty) {
+              isCollision = false;
+            } else {
+              // 撞號了 (counter 落後於實際資料)，自動 +1 重試
+              console.warn(`碰撞偵測：${finalQuoteNumber} 已存在，嘗試下一個...`);
+              nextSeq++;
+            }
+          }
+
+          // 3. 寫回計數器 (更新為最新可用的)
+          transaction.set(counterRef, { currentSeq: nextSeq, lastUpdated: serverTimestamp() }, { merge: true });
+
+          // 4. 建立新報價單
+          const newQuoteRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'));
+          newId = newQuoteRef.id;
+
+          const payload = {
+            ...formData,
+            ...updates,
+            quoteNumber: finalQuoteNumber, // 寫入正確單號
+            subtotal, tax, grandTotal,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          };
+
+          transaction.set(newQuoteRef, payload);
+        });
+
+        // Transaction 成功後，更新本地狀態
+        if (!quoteId) setActiveQuoteId(newId);
+        setFormData(prev => ({ ...prev, quoteNumber: finalQuoteNumber }));
+
+      } else {
+        // ✨ 既有模式：直接更新
+        const payload = { ...formData, ...updates, subtotal, tax, grandTotal, updatedAt: serverTimestamp() };
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotations', quoteId), payload);
+      }
+
+      await syncCustomerData(updates.clientName || formData.clientName, { ...formData, ...updates });
+      await syncProductData(formData.items);
+
+      setIsDirty(false); // ✨ 儲存成功，清除 Dirty 狀態
+
+      if (!silent) {
+        // 分成 'create' (新建立) 與 'update' (覆蓋更新)
+        const syncSuccess = await handleCloudSync(isNewQuote ? 'create' : 'update');
+        triggerToast(
+          syncSuccess ? '儲存成功，並已同步至雲端' : '儲存成功，但雲端同步失敗',
+          syncSuccess ? 'success' : 'error'
+        );
+      }
+    } catch (e) {
+      console.error("儲存失敗:", e);
+      alert(`儲存失敗: ${e.message}`);
+    }
+    if (!silent) setSaving(false);
+  };
+
+  const versionUp = async () => {
+    if (!confirm('確定要建立新版本嗎？')) return;
+    setSaving(true);
+    const newVer = formData.version + 1;
+    const newNumber = formData.quoteNumber.includes('-V')
+      ? formData.quoteNumber.replace(/-V\d+$/, `-V${newVer}`)
+      : `${formData.quoteNumber}-V${newVer}`;
+
+    const payload = {
+      ...formData,
+      quoteNumber: newNumber,
+      version: newVer,
+      status: 'draft',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      subtotal, tax, grandTotal
     };
 
-    const capturePrintHtml = () => {
-        // 構建報價項目表格行
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'quotations'), payload);
+    const syncSuccess = await handleCloudSync('version');
+    triggerToast(
+      syncSuccess ? '已建立新版本，並已同步至雲端' : '已建立新版本，但雲端同步失敗',
+      syncSuccess ? 'success' : 'error'
+    );
+    setSaving(false);
+    onBack();
+  };
+
+  const capturePrintHtml = () => {
+    // 構建報價項目表格行
     const itemsRows = formData.items.map((item, idx) => `
       <tr style="page-break-inside: avoid;">
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #6b7280; vertical-align: top;">${idx + 1}</td>
@@ -897,10 +897,10 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
 </body>
 </html>`;
 
-    };
+  };
 
-    const generateQuoteHtml = () => {
-        const itemsHtml = formData.items.map((item, idx) => `
+  const generateQuoteHtml = () => {
+    const itemsHtml = formData.items.map((item, idx) => `
       <tr>
         <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #6b7280;">${idx + 1}</td>
         <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #111827;">${item.name || ''}</td>
@@ -1275,53 +1275,53 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
 </body>
 </html>`;
 
-    };
+  };
 
-    const handleSend = async () => {
-        // 驗證客戶 Email
-        if (!formData.clientEmail) {
-            alert('❌ 請先填寫客戶 Email');
-            return;
-        }
+  const handleSend = async () => {
+    // 驗證客戶 Email
+    if (!formData.clientEmail) {
+      alert('❌ 請先填寫客戶 Email');
+      return;
+    }
 
-        // 驗證 Email 格式
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(formData.clientEmail)) {
-            alert('❌ 請輸入有效的 Email 格式');
-            return;
-        }
+    // 驗證 Email 格式
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.clientEmail)) {
+      alert('❌ 請輸入有效的 Email 格式');
+      return;
+    }
 
-        // 確認寄送
-        if (!confirm(`確定要寄送報價單給 ${formData.clientContact || formData.clientName}\n(${formData.clientEmail}) 嗎?`)) {
-            return;
-        }
+    // 確認寄送
+    if (!confirm(`確定要寄送報價單給 ${formData.clientContact || formData.clientName}\n(${formData.clientEmail}) 嗎?`)) {
+      return;
+    }
 
-        setSending(true);
-        setSendingMessage('儲存報價單...');
+    setSending(true);
+    setSendingMessage('儲存報價單...');
 
-        try {
-            // Step 1: 儲存報價單
-            await save(true);
+    try {
+      // Step 1: 儲存報價單
+      await save(true);
 
-            // Step 2: 生成 PDF HTML (使用新的 capturePrintHtml)
-            setSendingMessage('產生 PDF 報價單...');
-            const quoteHtml = capturePrintHtml();
+      // Step 2: 生成 PDF HTML (使用新的 capturePrintHtml)
+      setSendingMessage('產生 PDF 報價單...');
+      const quoteHtml = capturePrintHtml();
 
-            // Step 3: 準備 Email 內容
-            setSendingMessage('準備寄送...');
-            const emailData = {
-                to: formData.clientEmail,
-                subject: `【傑太環境】報價單 ${formData.quoteNumber} - ${formData.projectName || '專案報價'}`,
-                clientName: formData.clientName,
-                clientContact: formData.clientContact,
-                quoteNumber: formData.quoteNumber,
-                projectName: formData.projectName,
-                grandTotal: grandTotal,
-                companyContact: formData.companyContact,
-                companyPhone: formData.companyPhone,
-                quoteHtml: quoteHtml,
-                // Email 正文草稿
-                emailBody: `
+      // Step 3: 準備 Email 內容
+      setSendingMessage('準備寄送...');
+      const emailData = {
+        to: formData.clientEmail,
+        subject: `【傑太環境】報價單 ${formData.quoteNumber} - ${formData.projectName || '專案報價'}`,
+        clientName: formData.clientName,
+        clientContact: formData.clientContact,
+        quoteNumber: formData.quoteNumber,
+        projectName: formData.projectName,
+        grandTotal: grandTotal,
+        companyContact: formData.companyContact,
+        companyPhone: formData.companyPhone,
+        quoteHtml: quoteHtml,
+        // Email 正文草稿
+        emailBody: `
 ${formData.clientContact || formData.clientName} 您好，
 
 感謝您對傑太環境工程的信任與支持！
@@ -1342,44 +1342,44 @@ ${formData.companyContact || '張惟荏'}
 電話：${formData.companyPhone || '02-6609-5888 #103'}
 網站：https://www.jetenv.com.tw/
         `.trim()
-            };
+      };
 
-            // Step 4: 呼叫 n8n webhook
-            setSendingMessage('寄送中...');
-            const response = await fetch(N8N_EMAIL_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(emailData)
-            });
+      // Step 4: 呼叫 n8n webhook
+      setSendingMessage('寄送中...');
+      const response = await fetch(N8N_EMAIL_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailData)
+      });
 
-            if (!response.ok) {
-                throw new Error(`寄送失敗: ${response.status}`);
-            }
+      if (!response.ok) {
+        throw new Error(`寄送失敗: ${response.status}`);
+      }
 
-            // Step 5: 更新狀態為「已發送」
-            setSendingMessage('更新狀態...');
-            const newStatus = 'sent';
-            setFormData(prev => ({ ...prev, status: newStatus }));
-            await save(true, { status: newStatus });
+      // Step 5: 更新狀態為「已發送」
+      setSendingMessage('更新狀態...');
+      const newStatus = 'sent';
+      setFormData(prev => ({ ...prev, status: newStatus }));
+      await save(true, { status: newStatus });
 
-            alert(`✅ 報價單已成功寄送至 ${formData.clientEmail}`);
+      alert(`✅ 報價單已成功寄送至 ${formData.clientEmail}`);
 
-        } catch (error) {
-            console.error('寄送失敗:', error);
-            alert(`❌ 寄送失敗: ${error.message}\n請稍後再試或聯繫系統管理員`);
-        } finally {
-            setSending(false);
-            setSendingMessage('');
-        }
-    };
+    } catch (error) {
+      console.error('寄送失敗:', error);
+      alert(`❌ 寄送失敗: ${error.message}\n請稍後再試或聯繫系統管理員`);
+    } finally {
+      setSending(false);
+      setSendingMessage('');
+    }
+  };
 
-    if (loading) return <Spinner />;
+  if (loading) return <Spinner />;
 
-    return (
-        <>
-            <SendingOverlay isVisible={sending} message={sendingMessage} />
+  return (
+    <>
+      <SendingOverlay isVisible={sending} message={sendingMessage} />
       <div className={`bg-white ${isPrintMode ? '' : 'shadow-xl rounded-xl border border-gray-200'} flex flex-col min-h-[calc(100vh-6rem)] w-full`}>
 
         {!isPrintMode && (
@@ -1998,8 +1998,8 @@ ${formData.companyContact || '張惟荏'}
       `}</style>
       </div>
 
-        </>
-    );
+    </>
+  );
 };
 
 export default QuoteEditor;
