@@ -14,7 +14,7 @@ const SearchableClientSelect = ({ customers, onSelect, placeholder = "搜尋客�
         const lowerSearch = search.toLowerCase();
         return customers.filter(c =>
             c.name?.toLowerCase().includes(lowerSearch) ||
-            c.taxId?.includes(search)
+            String(c.taxId || '').includes(search)
         );
     }, [customers, search]);
 
