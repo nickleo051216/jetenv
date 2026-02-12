@@ -447,7 +447,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
   const capturePrintHtml = () => {
     // 構建報價項目表格行
     const itemsRows = formData.items.map((item, idx) => `
-      <tr style="page-break-inside: avoid;">
+      <tr style="page-break-inside: auto;">
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #6b7280; vertical-align: top;">${idx + 1}</td>
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
           <div style="font-size: 14px; font-weight: 700; color: #111827; white-space: pre-wrap;">${item.name || ''}</div>
@@ -745,7 +745,7 @@ const QuoteEditor = ({ user, quoteId, setActiveQuoteId, triggerToast, onBack, on
     /* 頁面內容區需要留出頁首頁尾空間 */
     .page-content {
       padding-top: 50px;
-      padding-bottom: 40px;
+      padding-bottom: 18mm;
     }
   </style>
 </head>
@@ -1958,7 +1958,7 @@ ${formData.companyContact || '張惟荏'}
           .min-h-screen { min-height: 0 !important; }
           
           .no-print { display: none !important; }
-          .print-container { padding: 0; margin: 0; width: 100%; }
+          .print-container { padding: 0; margin: 0; padding-bottom: 18mm; width: 100%; }
           .page-break-inside-avoid { page-break-inside: avoid; }
           
           /* 表格分頁設定 */
@@ -1966,7 +1966,10 @@ ${formData.companyContact || '張惟荏'}
           thead { display: table-header-group !important; }
           tbody { display: table-row-group !important; }
           tfoot { display: table-row-group !important; }
-          
+
+          /* 允許超長的表格行跨頁斷行，避免被頁尾遮擋 */
+          tbody tr { page-break-inside: auto !important; break-inside: auto !important; }
+
           /* 列印頁尾：固定在每頁底部 */
           .print-footer {
             display: block;
