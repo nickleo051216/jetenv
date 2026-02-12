@@ -1967,9 +1967,6 @@ ${formData.companyContact || '張惟荏'}
           tbody { display: table-row-group !important; }
           tfoot { display: table-row-group !important; }
 
-          /* 盡量保持表格行完整，避免單行被切成兩頁 */
-          tbody tr { page-break-inside: avoid; break-inside: avoid; }
-
           /* 列印頁尾：固定在每頁底部 */
           .print-footer {
             display: block;
