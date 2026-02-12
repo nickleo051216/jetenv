@@ -1945,7 +1945,7 @@ ${formData.companyContact || '張惟荏'}
         
         @media print {
           @page {
-            margin: 10mm 10mm 22mm 10mm;
+            margin: 10mm 10mm 16mm 10mm;
             size: A4 portrait;
           }
           html, body, #root { 
@@ -1958,7 +1958,7 @@ ${formData.companyContact || '張惟荏'}
           .min-h-screen { min-height: 0 !important; }
           
           .no-print { display: none !important; }
-          .print-container { padding: 0; margin: 0; padding-bottom: 18mm; width: 100%; }
+          .print-container { padding: 0; margin: 0; width: 100%; }
           .page-break-inside-avoid { page-break-inside: avoid; }
           
           /* 表格分頁設定 */
