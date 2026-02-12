@@ -1944,9 +1944,9 @@ ${formData.companyContact || '張惟荏'}
         }
         
         @media print {
-          @page { 
-            margin: 10mm 10mm 20mm 10mm;
-            size: A4 portrait; 
+          @page {
+            margin: 10mm 10mm 35mm 10mm;
+            size: A4 portrait;
           }
           html, body, #root { 
             height: auto !important; 
@@ -1967,8 +1967,8 @@ ${formData.companyContact || '張惟荏'}
           tbody { display: table-row-group !important; }
           tfoot { display: table-row-group !important; }
 
-          /* 允許超長的表格行跨頁斷行，避免被頁尾遮擋 */
-          tbody tr { page-break-inside: auto !important; break-inside: auto !important; }
+          /* 盡量保持表格行完整，避免單行被切成兩頁 */
+          tbody tr { page-break-inside: avoid; break-inside: avoid; }
 
           /* 列印頁尾：固定在每頁底部 */
           .print-footer {
