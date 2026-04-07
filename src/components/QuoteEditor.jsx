@@ -1945,7 +1945,7 @@ ${formData.companyContact || '張惟荏'}
         
         @media print {
           @page {
-            margin: 10mm 10mm 10mm 10mm;
+            margin: 10mm 10mm 22mm 10mm;
             size: A4 portrait;
           }
           html, body, #root { 
