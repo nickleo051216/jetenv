@@ -26,7 +26,7 @@ const Toast = ({ isVisible, message, type = 'success', onClose }) => {
 
     return (
         <div
-            className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[10000] transition-all duration-700 ease-out ${isFading ? 'opacity-0 translate-y-4 scale-95' : 'opacity-100 translate-y-0 scale-100'
+            className={`no-print fixed bottom-10 left-1/2 -translate-x-1/2 z-[10000] transition-all duration-700 ease-out ${isFading ? 'opacity-0 translate-y-4 scale-95' : 'opacity-100 translate-y-0 scale-100'
                 }`}
         >
             <div className={`bg-gradient-to-tr ${isError ? 'from-orange-600 to-red-700' : 'from-teal-600 to-teal-800'
